@@ -9,7 +9,11 @@ services:
     depends_on:
       - mongodb
       - rag_api
+<<<<<<< HEAD
     image: ghcr.io/danny-avila/librechat:latest
+=======
+    image: imran/librechat:latest
+>>>>>>> f2870c34 (compose)
     restart: always
     user: "${UID}:${GID}"
     extra_hosts:
