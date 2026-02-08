@@ -8,38 +8,37 @@ export default function ImpressumPage() {
 
         <h2>Angaben gemäß § 5 DDG</h2>
         <p>
-          [Ihr Unternehmen / Name]<br />
-          [Rechtsform, z.B. GmbH, UG (haftungsbeschränkt)]<br />
-          [Straße und Hausnummer]<br />
-          [PLZ Ort], Deutschland
+          Imran Hussain - Software Dienstleister<br />
+          Goldäckerstr. 66<br />
+          71144 Steinenbronn, Deutschland
         </p>
 
         <h2>Vertreten durch</h2>
-        <p>[Geschäftsführer/in: Vorname Nachname]</p>
+        <p>Imran Hussain</p>
 
         <h2>Kontakt</h2>
         <p>
-          Telefon: [+49 XXX XXXXXXX]<br />
-          E-Mail: [kontakt@example.com]
+          Telefon: [+49 176 37130790]<br />
+          E-Mail: info@imranhussain.de
         </p>
 
         <h2>Registereintrag</h2>
         <p>
           Eintragung im Handelsregister.<br />
-          Registergericht: [Amtsgericht Ort]<br />
-          Registernummer: [HRB XXXXX]
+          Registergericht: Amtsgericht Böblingen<br />
         </p>
 
         <h2>Umsatzsteuer-ID</h2>
         <p>
           Umsatzsteuer-Identifikationsnummer gemäß § 27a Umsatzsteuergesetz:<br />
-          [DE XXXXXXXXX]
+          DE362930028
         </p>
 
         <h2>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
         <p>
-          [Vorname Nachname]<br />
-          [Adresse wie oben]
+          Imran Hussain<br />
+          Goldäckerstr. 66<br />
+          71144 Steinenbronn, Deutschland
         </p>
 
         <h2>EU-Streitschlichtung</h2>
