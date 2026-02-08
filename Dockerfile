@@ -1,20 +1,11 @@
-# v0.8.3-rc1
+# Sheraliat AI - Multi-stage Docker Build
+# Based on LibreChat v0.8.2
 
-# Base node image
-FROM node:20-alpine AS node
+# ── Stage 1: Builder ──────────────────────────────────────────
+FROM node:20-alpine AS builder
 
-# Install jemalloc
-RUN apk add --no-cache jemalloc
-RUN apk add --no-cache python3 py3-pip uv
+RUN apk add --no-cache python3 py3-pip
 
-# Set environment variable to use jemalloc
-ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
-
-# Add `uv` for extended MCP support
-COPY --from=ghcr.io/astral-sh/uv:0.9.5-python3.12-alpine /usr/local/bin/uv /usr/local/bin/uvx /bin/
-RUN uv --version
-
-# Set configurable max-old-space-size with default
 ARG NODE_MAX_OLD_SPACE_SIZE=6144
 
 RUN mkdir -p /app && chown node:node /app
@@ -22,40 +13,77 @@ WORKDIR /app
 
 USER node
 
+# Copy package manifests for layer caching
 COPY --chown=node:node package.json package-lock.json ./
 COPY --chown=node:node api/package.json ./api/package.json
 COPY --chown=node:node client/package.json ./client/package.json
 COPY --chown=node:node packages/data-provider/package.json ./packages/data-provider/package.json
 COPY --chown=node:node packages/data-schemas/package.json ./packages/data-schemas/package.json
 COPY --chown=node:node packages/api/package.json ./packages/api/package.json
-
+COPY --chown=node:node packages/client/package.json ./packages/client/package.json
 
 RUN \
-    # Allow mounting of these files, which have no default
     touch .env ; \
-    # Create directories for the volumes to inherit the correct permissions
     mkdir -p /app/client/public/images /app/logs /app/uploads ; \
     npm config set fetch-retry-maxtimeout 600000 ; \
     npm config set fetch-retries 5 ; \
     npm config set fetch-retry-mintimeout 15000 ; \
     npm ci --no-audit
 
+# Copy source
 COPY --chown=node:node . .
 
+# Build frontend and prune dev dependencies
 RUN \
-    # React client build with configurable memory
-    NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run frontend; \
-    npm prune --production; \
+    NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run frontend && \
+    npm prune --production && \
     npm cache clean --force
 
-# Node API setup
-EXPOSE 3080
-ENV HOST=0.0.0.0
-CMD ["npm", "run", "backend"]
+# ── Stage 2: Runtime ──────────────────────────────────────────
+FROM node:20-alpine AS runner
 
-# Optional: for client with nginx routing
-# FROM nginx:stable-alpine AS nginx-client
-# WORKDIR /usr/share/nginx/html
-# COPY --from=node /app/client/dist /usr/share/nginx/html
-# COPY client/nginx.conf /etc/nginx/conf.d/default.conf
-# ENTRYPOINT ["nginx", "-g", "daemon off;"]
+# OCI Labels
+LABEL org.opencontainers.image.title="Sheraliat AI" \
+      org.opencontainers.image.description="German-hosted, branded fork of LibreChat" \
+      org.opencontainers.image.vendor="Your Company" \
+      org.opencontainers.image.source="https://github.com/your-org/sheraliat-ai" \
+      org.opencontainers.image.version="0.8.2"
+
+# Install runtime dependencies
+RUN apk add --no-cache jemalloc wget python3 py3-pip uv tini
+
+# Add uv for MCP support
+COPY --from=ghcr.io/astral-sh/uv:0.9.5-python3.12-alpine /usr/local/bin/uv /usr/local/bin/uvx /bin/
+
+# jemalloc for better memory management
+ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
+
+RUN mkdir -p /app && chown node:node /app
+WORKDIR /app
+
+USER node
+
+# Copy built artifacts from builder
+COPY --from=builder --chown=node:node /app/package.json /app/package-lock.json ./
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/api ./api
+COPY --from=builder --chown=node:node /app/client/dist ./client/dist
+COPY --from=builder --chown=node:node /app/client/public ./client/public
+COPY --from=builder --chown=node:node /app/packages ./packages
+COPY --from=builder --chown=node:node /app/config ./config
+COPY --from=builder --chown=node:node /app/src ./src
+
+# Ensure writable directories exist
+RUN mkdir -p /app/client/public/images /app/logs /app/uploads && touch /app/.env
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV BRAND_NAME="Sheraliat AI"
+
+EXPOSE 3080
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3080/api/health || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["npm", "run", "backend"]

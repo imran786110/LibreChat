@@ -132,6 +132,14 @@ const userSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
     },
+    consentPolicyVersion: {
+      type: String,
+      default: null,
+    },
+    consentTimestamp: {
+      type: Date,
+      default: null,
+    },
     personalization: {
       type: {
         memories: {

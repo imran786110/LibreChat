@@ -125,8 +125,8 @@ export function getOpenAIConfig(
   if (useOpenRouter || isVercel) {
     configOptions.defaultHeaders = Object.assign(
       {
-        'HTTP-Referer': 'https://librechat.ai',
-        'X-Title': 'LibreChat',
+        'HTTP-Referer': 'https://sheraliat.ai',
+        'X-Title': 'Sheraliat AI',
       },
       headers,
     );

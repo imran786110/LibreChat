@@ -3,43 +3,29 @@ import { TStartupConfig } from 'librechat-data-provider';
 
 function Footer({ startupConfig }: { startupConfig: TStartupConfig | null | undefined }) {
   const localize = useLocalize();
-  if (!startupConfig) {
-    return null;
-  }
-  const privacyPolicy = startupConfig.interface?.privacyPolicy;
-  const termsOfService = startupConfig.interface?.termsOfService;
 
-  const privacyPolicyRender = privacyPolicy?.externalUrl && (
-    <a
-      className="text-sm text-green-600 underline decoration-transparent transition-all duration-200 hover:text-green-700 hover:decoration-green-700 focus:text-green-700 focus:decoration-green-700 dark:text-green-500 dark:hover:text-green-400 dark:hover:decoration-green-400 dark:focus:text-green-400 dark:focus:decoration-green-400"
-      href={privacyPolicy.externalUrl}
-      // Removed for WCAG compliance
-      // target={privacyPolicy.openNewTab ? '_blank' : undefined}
-      rel="noreferrer"
-    >
-      {localize('com_ui_privacy_policy')}
-    </a>
-  );
+  const linkClass =
+    'text-sm text-[#800000] underline decoration-transparent transition-all duration-200 hover:text-[#6E0000] hover:decoration-[#6E0000] focus:text-[#6E0000] focus:decoration-[#6E0000] dark:text-[#B22222] dark:hover:text-[#d45050] dark:hover:decoration-[#d45050] dark:focus:text-[#d45050] dark:focus:decoration-[#d45050]';
 
-  const termsOfServiceRender = termsOfService?.externalUrl && (
-    <a
-      className="text-sm text-green-600 underline decoration-transparent transition-all duration-200 hover:text-green-700 hover:decoration-green-700 focus:text-green-700 focus:decoration-green-700 dark:text-green-500 dark:hover:text-green-400 dark:hover:decoration-green-400 dark:focus:text-green-400 dark:focus:decoration-green-400"
-      href={termsOfService.externalUrl}
-      // Removed for WCAG compliance
-      // target={termsOfService.openNewTab ? '_blank' : undefined}
-      rel="noreferrer"
-    >
-      {localize('com_ui_terms_of_service')}
-    </a>
-  );
+  const divider = <div className="border-r-[1px] border-gray-300 dark:border-gray-600" />;
+
+  // Always show legal links for Sheraliat AI, regardless of config
+  const privacyPolicy = startupConfig?.interface?.privacyPolicy;
+  const termsOfService = startupConfig?.interface?.termsOfService;
 
   return (
-    <div className="align-end m-4 flex justify-center gap-2" role="contentinfo">
-      {privacyPolicyRender}
-      {privacyPolicyRender && termsOfServiceRender && (
-        <div className="border-r-[1px] border-gray-300 dark:border-gray-600" />
-      )}
-      {termsOfServiceRender}
+    <div className="align-end m-4 flex flex-wrap justify-center gap-2" role="contentinfo">
+      <a className={linkClass} href={termsOfService?.externalUrl || '/terms'} rel="noreferrer">
+        {localize('com_sheraliat_terms_title')}
+      </a>
+      {divider}
+      <a className={linkClass} href={privacyPolicy?.externalUrl || '/privacy'} rel="noreferrer">
+        {localize('com_sheraliat_privacy_title')}
+      </a>
+      {divider}
+      <a className={linkClass} href="/impressum" rel="noreferrer">
+        {localize('com_sheraliat_impressum_title')}
+      </a>
     </div>
   );
 }

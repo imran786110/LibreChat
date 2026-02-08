@@ -79,7 +79,14 @@ const getTermsStatusController = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.status(200).json({ termsAccepted: !!user.termsAccepted });
+    const currentPolicyVersion = process.env.POLICY_VERSION || '2026-02-01';
+    const termsAccepted =
+      !!user.termsAccepted && user.consentPolicyVersion === currentPolicyVersion;
+    res.status(200).json({
+      termsAccepted,
+      consentPolicyVersion: user.consentPolicyVersion,
+      consentTimestamp: user.consentTimestamp,
+    });
   } catch (error) {
     logger.error('Error fetching terms acceptance status:', error);
     res.status(500).json({ message: 'Error fetching terms acceptance status' });
@@ -88,11 +95,24 @@ const getTermsStatusController = async (req, res) => {
 
 const acceptTermsController = async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(req.user.id, { termsAccepted: true }, { new: true });
+    const currentPolicyVersion = process.env.POLICY_VERSION || '2026-02-01';
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        termsAccepted: true,
+        consentPolicyVersion: currentPolicyVersion,
+        consentTimestamp: new Date(),
+      },
+      { new: true },
+    );
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.status(200).json({ message: 'Terms accepted successfully' });
+    res.status(200).json({
+      message: 'Terms accepted successfully',
+      consentPolicyVersion: currentPolicyVersion,
+      consentTimestamp: user.consentTimestamp,
+    });
   } catch (error) {
     logger.error('Error accepting terms:', error);
     res.status(500).json({ message: 'Error accepting terms' });

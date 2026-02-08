@@ -8,6 +8,7 @@ import {
   TwoFactorScreen,
   RequestPasswordReset,
 } from '~/components/Auth';
+import { TermsPage, PrivacyPage, ImpressumPage } from '~/components/Legal';
 import { MarketplaceProvider } from '~/components/Agents/MarketplaceContext';
 import AgentMarketplace from '~/components/Agents/Marketplace';
 import { OAuthSuccess, OAuthError } from '~/components/OAuth';
@@ -33,6 +34,21 @@ const baseHref = baseEl?.getAttribute('href') || '/';
 
 export const router = createBrowserRouter(
   [
+    {
+      path: 'terms',
+      element: <TermsPage />,
+      errorElement: <RouteErrorBoundary />,
+    },
+    {
+      path: 'privacy',
+      element: <PrivacyPage />,
+      errorElement: <RouteErrorBoundary />,
+    },
+    {
+      path: 'impressum',
+      element: <ImpressumPage />,
+      errorElement: <RouteErrorBoundary />,
+    },
     {
       path: 'share/:shareId',
       element: <ShareRoute />,

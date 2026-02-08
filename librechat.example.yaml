@@ -27,58 +27,58 @@ cache: true
 
 # Custom interface configuration
 interface:
-  customWelcome: 'Welcome to LibreChat! Enjoy your experience.'
+  customWelcome: 'Willkommen bei Sheraliat AI! Viel Spaß bei der Nutzung.'
   # Enable/disable file search as a chatarea selection (default: true)
   # Note: This setting does not disable the Agents File Search Capability.
   # To disable the Agents Capability, see the Agents Endpoint configuration instead.
   fileSearch: true
   # Privacy policy settings
   privacyPolicy:
-    externalUrl: 'https://librechat.ai/privacy-policy'
+    externalUrl: '/privacy'
     openNewTab: true
 
   # Terms of service
   termsOfService:
-    externalUrl: 'https://librechat.ai/tos'
+    externalUrl: '/terms'
     openNewTab: true
     modalAcceptance: true
-    modalTitle: 'Terms of Service for LibreChat'
+    modalTitle: 'Nutzungsbedingungen für Sheraliat AI'
     modalContent: |
-      # Terms and Conditions for LibreChat
+      # Nutzungsbedingungen für Sheraliat AI
 
-      *Effective Date: February 18, 2024*
+      *Gültig ab: 1. Februar 2026*
 
-      Welcome to LibreChat, the informational website for the open-source AI chat platform, available at https://librechat.ai. These Terms of Service ("Terms") govern your use of our website and the services we offer. By accessing or using the Website, you agree to be bound by these Terms and our Privacy Policy, accessible at https://librechat.ai//privacy.
+      Willkommen bei Sheraliat AI. Diese Nutzungsbedingungen regeln die Nutzung unserer Plattform. Mit der Nutzung stimmen Sie diesen Bedingungen und unserer Datenschutzerklärung zu.
 
-      ## 1. Ownership
+      ## 1. Geltungsbereich
 
-      Upon purchasing a package from LibreChat, you are granted the right to download and use the code for accessing an admin panel for LibreChat. While you own the downloaded code, you are expressly prohibited from reselling, redistributing, or otherwise transferring the code to third parties without explicit permission from LibreChat.
+      Diese Bedingungen gelten für alle Nutzer der Sheraliat AI Plattform. Die Plattform wird in Deutschland gehostet und unterliegt deutschem Recht.
 
-      ## 2. User Data
+      ## 2. Nutzerdaten
 
-      We collect personal data, such as your name, email address, and payment information, as described in our Privacy Policy. This information is collected to provide and improve our services, process transactions, and communicate with you.
+      Wir erheben personenbezogene Daten gemäß unserer Datenschutzerklärung und den Anforderungen der DSGVO. Alle Daten werden ausschließlich auf Servern in Deutschland gespeichert.
 
-      ## 3. Non-Personal Data Collection
+      ## 3. Zulässige Nutzung
 
-      The Website uses cookies to enhance user experience, analyze site usage, and facilitate certain functionalities. By using the Website, you consent to the use of cookies in accordance with our Privacy Policy.
+      Sie verpflichten sich, die Plattform nur für rechtmäßige Zwecke zu nutzen und die Rechte anderer Nutzer nicht zu beeinträchtigen.
 
-      ## 4. Use of the Website
+      ## 4. Haftung
 
-      You agree to use the Website only for lawful purposes and in a manner that does not infringe the rights of, restrict, or inhibit anyone else's use and enjoyment of the Website. Prohibited behavior includes harassing or causing distress or inconvenience to any person, transmitting obscene or offensive content, or disrupting the normal flow of dialogue within the Website.
+      Die Haftung richtet sich nach den gesetzlichen Bestimmungen. Für KI-generierte Inhalte übernehmen wir keine Gewähr.
 
-      ## 5. Governing Law
+      ## 5. Anwendbares Recht
 
-      These Terms shall be governed by and construed in accordance with the laws of the United States, without giving effect to any principles of conflicts of law.
+      Es gilt das Recht der Bundesrepublik Deutschland. Gerichtsstand ist [Ihr Standort].
 
-      ## 6. Changes to the Terms
+      ## 6. Änderungen
 
-      We reserve the right to modify these Terms at any time. We will notify users of any changes by email. Your continued use of the Website after such changes have been notified will constitute your consent to such changes.
+      Wir behalten uns vor, diese Bedingungen jederzeit zu ändern. Nutzer werden über Änderungen informiert.
 
-      ## 7. Contact Information
+      ## 7. Kontakt
 
-      If you have any questions about these Terms, please contact us at contact@librechat.ai.
+      Bei Fragen zu diesen Bedingungen kontaktieren Sie uns unter [kontakt@ihre-domain.de].
 
-      By using the Website, you acknowledge that you have read these Terms of Service and agree to be bound by them.
+      Mit der Nutzung der Plattform bestätigen Sie, dass Sie diese Nutzungsbedingungen gelesen haben und ihnen zustimmen.
 
   endpointsMenu: true
   modelSelect: true
@@ -127,9 +127,9 @@ interface:
     #     de-DE: 'Ich verstehe und möchte fortfahren' # You can narrow translation to regions like (de-DE or de-CH)
     #   subLabel:
     #     en: |
-    #       Librechat hasn't reviewed this MCP server. Attackers may attempt to steal your data or trick the model into taking unintended actions, including destroying data. <a href="https://google.de" target="_blank"><strong>Learn more.</strong></a>
+    #       Sheraliat AI hasn't reviewed this MCP server. Attackers may attempt to steal your data or trick the model into taking unintended actions, including destroying data. <a href="https://google.de" target="_blank"><strong>Learn more.</strong></a>
     #     de: |
-    #       LibreChat hat diesen MCP-Server nicht überprüft. Angreifer könnten versuchen, Ihre Daten zu stehlen oder das Modell zu unbeabsichtigten Aktionen zu verleiten, einschließlich der Zerstörung von Daten. <a href="https://google.de" target="_blank"><strong>Mehr erfahren.</strong></a>
+    #       Sheraliat AI hat diesen MCP-Server nicht überprüft. Angreifer könnten versuchen, Ihre Daten zu stehlen oder das Modell zu unbeabsichtigten Aktionen zu verleiten, einschließlich der Zerstörung von Daten. <a href="https://google.de" target="_blank"><strong>Mehr erfahren.</strong></a>
 
   # Temporary chat retention period in hours (default: 720, min: 1, max: 8760)
   # temporaryChatRetention: 1
@@ -198,7 +198,7 @@ registration:
 actions:
   allowedDomains:
     - 'swapi.dev'
-    - 'librechat.ai'
+    # - 'librechat.ai'
     - 'google.com'
     # - 'http://10.225.26.25:7894'  # Internal IP with protocol/port (uncomment if needed)
 
@@ -234,8 +234,8 @@ actions:
 #     args:
 #       - -y
 #       - "@modelcontextprotocol/server-filesystem"
-#       - /home/user/LibreChat/
-#     iconPath: /home/user/LibreChat/client/public/assets/logo.svg
+#       - /home/user/sheraliat-ai/
+#     iconPath: /home/user/sheraliat-ai/client/public/assets/logo.svg
 #   mcp-obsidian:
 #     command: npx
 #     args:
