@@ -6,7 +6,7 @@ FROM node:20-alpine AS builder
 
 RUN apk add --no-cache python3 py3-pip
 
-ARG NODE_MAX_OLD_SPACE_SIZE=2048
+ARG NODE_MAX_OLD_SPACE_SIZE=3072
 
 RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
