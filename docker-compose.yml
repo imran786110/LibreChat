@@ -9,7 +9,7 @@ services:
     depends_on:
       - mongodb
       - rag_api
-    image: ${SHERALIAT_IMAGE:-registry.example.com/sheraliat-ai/web:latest}
+    image: librechat:sheraliat-branding
     restart: always
     user: "${LOCAL_UID}:${LOCAL_GID}"
     extra_hosts:

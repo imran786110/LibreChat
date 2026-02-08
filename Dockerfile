@@ -6,7 +6,7 @@ FROM node:20-alpine AS builder
 
 RUN apk add --no-cache python3 py3-pip
 
-ARG NODE_MAX_OLD_SPACE_SIZE=6144
+ARG NODE_MAX_OLD_SPACE_SIZE=2048
 
 RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
@@ -33,11 +33,16 @@ RUN \
 # Copy source
 COPY --chown=node:node . .
 
-# Build frontend and prune dev dependencies
-RUN \
-    NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run frontend && \
-    npm prune --production && \
-    npm cache clean --force
+# Build packages then frontend
+ENV NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}"
+RUN npm run build:data-provider
+RUN npm run build:data-schemas
+RUN npm run build:api
+RUN npm run build:client-package
+RUN cd client && npm run build
+
+# Prune dev dependencies
+RUN npm prune --production && npm cache clean --force
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
 FROM node:20-alpine AS runner
