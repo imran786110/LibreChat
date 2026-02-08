@@ -57,13 +57,13 @@ function AuthLayout({
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-white dark:bg-gray-900">
+    <div className="auth-bg relative flex min-h-screen flex-col">
       <Banner />
       <BlinkAnimation active={isFetching}>
-        <div className="mt-6 h-10 w-full bg-cover">
+        <div className="mt-8 flex w-full justify-center">
           <img
-            src="assets/logo.svg"
-            className="h-full w-full object-contain"
+            src="assets/sheraliat-ai.png"
+            className="h-24 w-24 rounded-2xl object-contain drop-shadow-lg"
             alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'Sheraliat AI' })}
           />
         </div>
@@ -74,7 +74,7 @@ function AuthLayout({
       </div>
 
       <main className="flex flex-grow items-center justify-center">
-        <div className="w-authPageWidth overflow-hidden bg-white px-6 py-4 dark:bg-gray-900 sm:max-w-md sm:rounded-lg">
+        <div className="w-authPageWidth overflow-hidden rounded-2xl border border-white/10 bg-white/90 px-6 py-4 shadow-2xl backdrop-blur-md dark:bg-gray-900/80 sm:max-w-md">
           {!hasStartupConfigError && !isFetching && header && (
             <h1
               className="mb-4 text-center text-3xl font-semibold text-black dark:text-white"

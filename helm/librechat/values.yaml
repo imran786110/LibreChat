@@ -58,12 +58,12 @@ librechat:
   #   interface:
   #     # Privacy policy settings
   #     privacyPolicy:
-  #       externalUrl: 'https://librechat.ai/privacy-policy'
+  #       externalUrl: 'https://chat.sheraliat.com/privacy'
   #       openNewTab: true
 
   #     # Terms of service
   #     termsOfService:
-  #       externalUrl: 'https://librechat.ai/tos'
+  #       externalUrl: 'https://chat.sheraliat.com/terms'
   #       openNewTab: true
 
   #   registration:

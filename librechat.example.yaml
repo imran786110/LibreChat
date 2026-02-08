@@ -34,12 +34,12 @@ interface:
   fileSearch: true
   # Privacy policy settings
   privacyPolicy:
-    externalUrl: '/privacy'
+    externalUrl: 'https://chat.sheraliat.com/privacy'
     openNewTab: true
 
   # Terms of service
   termsOfService:
-    externalUrl: '/terms'
+    externalUrl: 'https://chat.sheraliat.com/terms'
     openNewTab: true
     modalAcceptance: true
     modalTitle: 'Nutzungsbedingungen für Sheraliat AI'
