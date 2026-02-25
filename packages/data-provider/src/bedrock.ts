@@ -2,7 +2,6 @@ import { z } from 'zod';
 import * as s from './schemas';
 
 const DEFAULT_ENABLED_MAX_TOKENS = 8192;
-const DEFAULT_ADAPTIVE_MAX_TOKENS = 16000;
 const DEFAULT_THINKING_BUDGET = 2000;
 
 type ThinkingConfig = { type: 'enabled'; budget_tokens: number } | { type: 'adaptive' };
@@ -36,27 +35,34 @@ function parseOpusVersion(model: string): { major: number; minor: number } | nul
   return null;
 }
 
-/** Extracts sonnet major version from both naming formats */
-function parseSonnetVersion(model: string): number | null {
-  const nameFirst = model.match(/claude-sonnet[-.]?(\d+)/);
+/** Extracts sonnet major/minor version from both naming formats.
+ *  Uses single-digit minor capture to avoid matching date suffixes (e.g., -20250514). */
+function parseSonnetVersion(model: string): { major: number; minor: number } | null {
+  const nameFirst = model.match(/claude-sonnet[-.]?(\d+)(?:[-.](\d)(?!\d))?/);
   if (nameFirst) {
-    return parseInt(nameFirst[1], 10);
+    return {
+      major: parseInt(nameFirst[1], 10),
+      minor: nameFirst[2] != null ? parseInt(nameFirst[2], 10) : 0,
+    };
   }
-  const numFirst = model.match(/claude-(\d+)(?:[-.]?\d+)?-sonnet/);
+  const numFirst = model.match(/claude-(\d+)(?:[-.](\d)(?!\d))?-sonnet/);
   if (numFirst) {
-    return parseInt(numFirst[1], 10);
+    return {
+      major: parseInt(numFirst[1], 10),
+      minor: numFirst[2] != null ? parseInt(numFirst[2], 10) : 0,
+    };
   }
   return null;
 }
 
-/** Checks if a model supports adaptive thinking (Opus 4.6+, Sonnet 5+) */
+/** Checks if a model supports adaptive thinking (Opus 4.6+, Sonnet 4.6+) */
 export function supportsAdaptiveThinking(model: string): boolean {
   const opus = parseOpusVersion(model);
   if (opus && (opus.major > 4 || (opus.major === 4 && opus.minor >= 6))) {
     return true;
   }
   const sonnet = parseSonnetVersion(model);
-  if (sonnet != null && sonnet >= 5) {
+  if (sonnet != null && (sonnet.major > 4 || (sonnet.major === 4 && sonnet.minor >= 6))) {
     return true;
   }
   return false;
@@ -65,7 +71,7 @@ export function supportsAdaptiveThinking(model: string): boolean {
 /** Checks if a model qualifies for the context-1m beta header (Sonnet 4+, Opus 4.6+, Opus 5+) */
 export function supportsContext1m(model: string): boolean {
   const sonnet = parseSonnetVersion(model);
-  if (sonnet != null && sonnet >= 4) {
+  if (sonnet != null && sonnet.major >= 4) {
     return true;
   }
   const opus = parseOpusVersion(model);
@@ -340,8 +346,9 @@ function configureThinking(data: AnthropicInput): AnthropicInput {
     thinking != null &&
     (thinking as { type: string }).type === 'adaptive'
   ) {
-    updatedData.maxTokens =
-      updatedData.maxTokens ?? updatedData.maxOutputTokens ?? DEFAULT_ADAPTIVE_MAX_TOKENS;
+    if (updatedData.maxTokens == null && updatedData.maxOutputTokens != null) {
+      updatedData.maxTokens = updatedData.maxOutputTokens;
+    }
     delete updatedData.maxOutputTokens;
     delete updatedData.additionalModelRequestFields!.thinkingBudget;
   }
