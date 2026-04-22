@@ -36,9 +36,9 @@ command -v docker >/dev/null 2>&1 || fail "docker not found"
 # ── 2. Pull latest code ───────────────────────
 if [ "$SKIP_PULL" = false ]; then
   log "Pulling latest code from $REMOTE/$BRANCH..."
-  git fetch "$REMOTE" "$BRANCH"
-  git checkout "$BRANCH"
-  git merge --ff-only "$REMOTE/$BRANCH" || fail "Fast-forward failed — local commits exist. Resolve manually or use --skip-pull."
+  git checkout "$BRANCH" 2>/dev/null || true
+  git pull "$REMOTE" "$BRANCH" || fail "git pull failed — resolve any conflicts manually then re-run with --skip-pull."
+  log "Code up to date: $(git log -1 --format='%h %s')"
 fi
 
 # ── 3. Build Docker image ─────────────────────
