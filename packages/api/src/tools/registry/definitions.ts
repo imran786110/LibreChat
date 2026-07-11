@@ -1,8 +1,5 @@
-import {
-  WebSearchToolDefinition,
-  CalculatorToolDefinition,
-  CodeExecutionToolDefinition,
-} from '@librechat/agents';
+import { WebSearchToolDefinition, CalculatorToolDefinition } from '@librechat/agents';
+import { AskUserQuestionToolDefinition } from '~/agents/hitl/askUserQuestionTool';
 import { geminiToolkit } from '~/tools/toolkits/gemini';
 import { oaiToolkit } from '~/tools/toolkits/oai';
 
@@ -451,7 +448,17 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
   },
 };
 
-/** Tool definitions from @librechat/agents */
+/**
+ * Tool definitions from @librechat/agents.
+ *
+ * `CodeExecutionToolDefinition` (the legacy `execute_code` tool) is
+ * intentionally absent — the `execute_code` capability now expands into
+ * the skill-flavored `bash_tool` + `read_file` pair, registered at
+ * initialize-time by `registerCodeExecutionTools`. Agents whose `tools`
+ * array contains the literal string `execute_code` continue to work:
+ * the capability gate still filters on that string, and the runtime
+ * registers the tool pair on match.
+ */
 const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   [CalculatorToolDefinition.name]: {
     name: CalculatorToolDefinition.name,
@@ -459,16 +466,16 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
     schema: CalculatorToolDefinition.schema as unknown as ExtendedJsonSchema,
     toolType: 'builtin',
   },
-  [CodeExecutionToolDefinition.name]: {
-    name: CodeExecutionToolDefinition.name,
-    description: CodeExecutionToolDefinition.description,
-    schema: CodeExecutionToolDefinition.schema as unknown as ExtendedJsonSchema,
-    toolType: 'builtin',
-  },
   [WebSearchToolDefinition.name]: {
     name: WebSearchToolDefinition.name,
     description: WebSearchToolDefinition.description,
     schema: WebSearchToolDefinition.schema as unknown as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  [AskUserQuestionToolDefinition.name]: {
+    name: AskUserQuestionToolDefinition.name,
+    description: AskUserQuestionToolDefinition.description,
+    schema: AskUserQuestionToolDefinition.schema as ExtendedJsonSchema,
     toolType: 'builtin',
   },
 };

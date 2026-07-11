@@ -1,5 +1,4 @@
 import { logger } from '@librechat/data-schemas';
-import type { AppConfig } from '@librechat/data-schemas';
 import {
   Tools,
   Constants,
@@ -13,9 +12,13 @@ import type {
   TModelSpec,
   Agent,
 } from 'librechat-data-provider';
+import type { AppConfig } from '@librechat/data-schemas';
+import { ASK_USER_QUESTION_TOOL_NAME } from '~/agents/hitl/askUserQuestionTool';
+import { requiresEphemeralUserConnection } from '~/mcp/utils';
 import { getCustomEndpointConfig } from '~/app/config';
 
 const { mcp_all, mcp_delimiter } = Constants;
+type ModelParametersWithPromptPrefix = AgentModelParameters & { promptPrefix?: string | null };
 
 export interface LoadAgentDeps {
   getAgent: (searchParameter: { id: string }) => Promise<Agent | null>;
@@ -71,6 +74,15 @@ export async function loadEphemeralAgent(
   if (ephemeralAgent?.web_search === true || modelSpec?.webSearch === true) {
     tools.push(Tools.web_search);
   }
+  if (ephemeralAgent?.memory === true || modelSpec?.memory === true) {
+    tools.push(Tools.memory);
+  }
+  /** Same downstream gating as persisted agents applies: `createRun` only
+   *  equips the tool when the request is HITL-capable, the agent is not a
+   *  subagent, and the admin hasn't excluded it (filteredTools/includedTools). */
+  if (ephemeralAgent?.ask_user_question === true || modelSpec?.askUserQuestion === true) {
+    tools.push(ASK_USER_QUESTION_TOOL_NAME);
+  }
 
   const addedServers = new Set<string>();
   if (mcpServers.size > 0) {
@@ -78,7 +90,13 @@ export async function loadEphemeralAgent(
       if (addedServers.has(mcpServer)) {
         continue;
       }
-      const serverTools = await deps.getMCPServerTools(userId, mcpServer);
+      /** Request-tier overlays are invisible to the cache service's registry
+       *  resolver — overlay-scoped servers expand fresh via `mcp_all` instead */
+      const overlayConfig = req.config?.mcpConfig?.[mcpServer];
+      const serverTools =
+        overlayConfig && requiresEphemeralUserConnection(overlayConfig)
+          ? null
+          : await deps.getMCPServerTools(userId, mcpServer);
       if (!serverTools) {
         tools.push(`${mcp_all}${mcp_delimiter}${mcpServer}`);
         addedServers.add(mcpServer);
@@ -89,7 +107,11 @@ export async function loadEphemeralAgent(
     }
   }
 
-  const instructions = req.body?.promptPrefix;
+  const requestPromptPrefix = req.body?.promptPrefix;
+  const { promptPrefix: modelPromptPrefix, ...safeModelParameters } =
+    model_parameters as ModelParametersWithPromptPrefix;
+  const instructions =
+    typeof modelPromptPrefix === 'string' ? modelPromptPrefix : requestPromptPrefix;
 
   // Get endpoint config for modelDisplayLabel fallback
   const appConfig = req.config;
@@ -122,13 +144,27 @@ export async function loadEphemeralAgent(
     id: ephemeralId,
     instructions,
     provider: endpoint,
-    model_parameters,
+    model_parameters: safeModelParameters as AgentModelParameters,
     model,
     tools,
   };
 
   if (ephemeralAgent?.artifacts) {
     result.artifacts = ephemeralAgent.artifacts;
+  }
+  if (modelSpec?.subagents) {
+    result.subagents = modelSpec.subagents;
+  }
+  if (modelSpec && Object.prototype.hasOwnProperty.call(modelSpec, 'skills')) {
+    if (modelSpec.skills === true) {
+      result.skills_enabled = true;
+    } else if (modelSpec.skills === false) {
+      result.skills_enabled = false;
+      result.skills = [];
+    } else if (Array.isArray(modelSpec.skills)) {
+      result.skills_enabled = true;
+      result.skills = [];
+    }
   }
   return result as Agent;
 }
