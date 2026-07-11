@@ -27,16 +27,17 @@ RUN \
     mkdir -p /app/client/public/images /app/logs /app/uploads ; \
     npm config set fetch-retry-maxtimeout 600000 ; \
     npm config set fetch-retries 5 ; \
-    npm config set fetch-retry-mintimeout 15000 ; \
+    npm config set fetch-retry-mintimeout 15000
+
+RUN --mount=type=cache,target=/home/node/.npm,uid=1000 \
     attempt=1 ; \
-    until timeout "$NPM_CI_TIMEOUT_SECONDS" npm ci --no-audit ; do \
+    until npm ci --no-audit --prefer-offline ; do \
         status=$? ; \
-        if [ "$attempt" -ge "$NPM_CI_ATTEMPTS" ]; then \
+        if [ "$attempt" -ge "${NPM_CI_ATTEMPTS:-3}" ]; then \
             exit "$status" ; \
         fi ; \
-        echo "npm ci --no-audit failed with exit code $status; retrying attempt $((attempt + 1))/$NPM_CI_ATTEMPTS" ; \
+        echo "npm ci failed (exit $status); retrying attempt $((attempt + 1))/${NPM_CI_ATTEMPTS:-3}" ; \
         attempt=$((attempt + 1)) ; \
-        npm cache clean --force || true ; \
         sleep 10 ; \
     done
 
