@@ -181,7 +181,7 @@ export default defineConfig(({ command }) => ({
   build: {
     sourcemap: buildSourceMap,
     outDir: './dist',
-    minify: 'esbuild',
+    minify: 'oxc',
     rollupOptions: {
       preserveEntrySignatures: 'strict',
       output: {
