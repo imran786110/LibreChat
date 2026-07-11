@@ -50,7 +50,8 @@ RUN npm run build:data-provider
 RUN npm run build:data-schemas
 RUN npm run build:api
 RUN npm run build:client-package
-RUN cd client && npm run build
+RUN --mount=type=cache,target=/app/client/node_modules/.vite,uid=1000 \
+    cd client && npm run build
 
 # Prune dev dependencies
 RUN npm prune --production && npm cache clean --force
