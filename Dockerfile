@@ -2,7 +2,7 @@
 # Based on LibreChat v0.8.2
 
 # ── Stage 1: Builder ──────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 RUN apk add --no-cache python3 py3-pip
 
@@ -56,7 +56,7 @@ RUN cd client && npm run build
 RUN npm prune --production && npm cache clean --force
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 # OCI Labels
 LABEL org.opencontainers.image.title="Sheraliat AI" \
