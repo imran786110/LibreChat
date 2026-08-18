@@ -100,7 +100,7 @@ ENV BRAND_NAME="Sheraliat AI"
 EXPOSE 3080
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3080/api/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3080/health || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["npm", "run", "backend"]
