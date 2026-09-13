@@ -1,4 +1,8 @@
-import type { RefillIntervalUnit, TUserFavorite } from 'librechat-data-provider';
+import type {
+  TUserFavorite,
+  RefillIntervalUnit,
+  StatefulCodeEnvironment,
+} from 'librechat-data-provider';
 import type { Document, Types } from 'mongoose';
 import { CursorPaginationParams } from '~/common';
 
@@ -52,8 +56,12 @@ export interface IUser extends Document {
   consentTimestamp?: Date;
   personalization?: {
     memories?: boolean;
+    statefulCodeEnvironment?: StatefulCodeEnvironment;
   };
   favorites?: TUserFavorite[];
+  /** Display order for the sidebar's Pinned section: favorite and pinned-chat
+   *  entry keys interleaved (`agent:`, `spec:`, `model:`, `convo:` prefixes). */
+  pinnedOrder?: string[];
   /** Per-skill active/inactive overrides. Key = skillId, value = active state. */
   skillStates?: Record<string, boolean>;
   createdAt?: Date;
@@ -99,6 +107,7 @@ export interface UpdateUserRequest {
   consentTimestamp?: Date;
   personalization?: {
     memories?: boolean;
+    statefulCodeEnvironment?: StatefulCodeEnvironment;
   };
   skillStates?: Record<string, boolean>;
 }

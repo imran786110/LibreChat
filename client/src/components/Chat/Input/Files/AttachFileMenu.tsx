@@ -9,6 +9,7 @@ import {
   TerminalSquareIcon,
 } from 'lucide-react';
 import {
+  IconButton,
   FileUpload,
   TooltipAnchor,
   DropdownPopup,
@@ -19,12 +20,17 @@ import {
   Providers,
   EToolResources,
   EModelEndpoint,
-  isPermissiveMimeConfig,
+  getConfiguredMimeAccept,
+  bedrockDocumentMimeTypes,
   defaultAgentCapabilities,
   bedrockDocumentExtensions,
   isDocumentSupportedProvider,
 } from 'librechat-data-provider';
-import type { EndpointFileConfig, TConversation } from 'librechat-data-provider';
+import type {
+  TConversation,
+  EndpointFileConfig,
+  MimeUploadCapability,
+} from 'librechat-data-provider';
 import type { ExtendedFile, FileSetter } from '~/common';
 import {
   useAgentToolPermissions,
@@ -48,6 +54,22 @@ type FileUploadType =
   | 'image_document_extended'
   | 'image_document_video_audio';
 
+/** What each provider upload path can actually send, used to scope the picker filter to selectable files. */
+const fileTypeCapabilities: Record<FileUploadType, MimeUploadCapability> = {
+  image: { categories: ['image'] },
+  document: { categories: ['document'] },
+  image_document: { categories: ['image', 'document'] },
+  image_document_extended: {
+    categories: ['image', 'document'],
+    documentMimeTypes: bedrockDocumentMimeTypes,
+  },
+  /** Google/Vertex/OpenRouter media path: documents are limited to PDF (see isProviderAttachType). */
+  image_document_video_audio: {
+    categories: ['image', 'document', 'audio', 'video'],
+    documentMimeTypes: ['application/pdf'],
+  },
+};
+
 interface AttachFileMenuProps {
   agentId?: string | null;
   endpoint?: string | null;
@@ -55,6 +77,8 @@ interface AttachFileMenuProps {
   conversationId: string;
   endpointType?: EModelEndpoint | string;
   endpointFileConfig?: EndpointFileConfig;
+  /** Resolved by the parent, which knows whether the file config has landed. */
+  isUnifiedMode: boolean;
   useResponsesApi?: boolean;
   files: Map<string, ExtendedFile>;
   setFiles: FileSetter;
@@ -69,6 +93,7 @@ const AttachFileMenu = ({
   endpointType,
   conversationId,
   endpointFileConfig,
+  isUnifiedMode,
   useResponsesApi,
   files,
   setFiles,
@@ -120,11 +145,15 @@ const AttachFileMenu = ({
         return;
       }
       inputRef.current.value = '';
-      if (
-        fileType !== undefined &&
-        isPermissiveMimeConfig(endpointFileConfig?.supportedMimeTypes)
-      ) {
-        inputRef.current.accept = '';
+      const configuredAccept =
+        fileType !== undefined
+          ? getConfiguredMimeAccept(
+              endpointFileConfig?.supportedMimeTypes,
+              fileTypeCapabilities[fileType],
+            )
+          : undefined;
+      if (configuredAccept != null) {
+        inputRef.current.accept = configuredAccept;
       } else if (fileType === 'image') {
         inputRef.current.accept = 'image/*,.heif,.heic';
       } else if (fileType === 'document') {
@@ -139,9 +168,36 @@ const AttachFileMenu = ({
         inputRef.current.accept = '';
       }
       inputRef.current.click();
-      inputRef.current.accept = '';
     },
     [endpointFileConfig?.supportedMimeTypes],
+  );
+
+  /** Unified mode: single click triggers file upload with no tool_resource */
+  const handleUnifiedUpload = useCallback(() => {
+    toolResourceRef.current = undefined;
+    handleUploadClick();
+  }, [handleUploadClick]);
+
+  /** Unified mode removed the destination chooser, not the source chooser. SharePoint has
+   *  no trigger of its own, so without this the picker becomes unreachable whenever the
+   *  composer is in unified mode. Destination stays implicit on both sources. */
+  const unifiedSourceItems = useMemo<MenuItemProps[]>(
+    () => [
+      {
+        label: localize('com_files_upload_local_machine'),
+        onClick: handleUnifiedUpload,
+        icon: <FileImageIcon className="icon-md" />,
+      },
+      {
+        label: localize('com_files_upload_sharepoint'),
+        onClick: () => {
+          toolResourceRef.current = undefined;
+          setIsSharePointDialogOpen(true);
+        },
+        icon: <SharePointIcon className="icon-md" />,
+      },
+    ],
+    [localize, handleUnifiedUpload, setIsSharePointDialogOpen],
   );
 
   const dropdownItems = useMemo(() => {
@@ -282,8 +338,8 @@ const AttachFileMenu = ({
           aria-label="Attach File Options"
           aria-keyshortcuts={uploadFileAriaKey}
           className={cn(
-            'flex size-9 items-center justify-center rounded-full p-1 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-opacity-50',
-            isPopoverActive && 'bg-surface-hover',
+            'flex size-theme-control items-center justify-center rounded-theme-control-round p-1 transition-colors duration-theme-fast hover:bg-surface-composer-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary focus-visible:ring-opacity-50',
+            isPopoverActive && 'bg-surface-composer-hover',
           )}
         >
           <div className="flex w-full items-center justify-center gap-2">
@@ -305,6 +361,63 @@ const AttachFileMenu = ({
     }
   };
 
+  if (isUnifiedMode) {
+    return (
+      <>
+        <FileUpload
+          ref={inputRef}
+          handleFileChange={(e) => {
+            handleFileChange(e, toolResourceRef.current);
+          }}
+        >
+          {sharePointEnabled === true ? (
+            <DropdownPopup
+              menuId="attach-file-menu"
+              className="overflow-visible"
+              isOpen={isPopoverActive}
+              setIsOpen={setIsPopoverActive}
+              modal={false}
+              portal={true}
+              unmountOnHide={true}
+              trigger={menuTrigger}
+              items={unifiedSourceItems}
+              iconClassName="mr-0"
+            />
+          ) : (
+            <TooltipAnchor
+              render={
+                <IconButton
+                  type="button"
+                  size="theme"
+                  shape="theme"
+                  disabled={isUploadDisabled}
+                  id="attach-file-button"
+                  label={localize('com_sidepanel_attach_files')}
+                  onClick={handleUnifiedUpload}
+                  aria-keyshortcuts={uploadFileAriaKey}
+                  className="p-1 hover:bg-surface-composer-hover"
+                >
+                  <AttachmentIcon />
+                </IconButton>
+              }
+              id="attach-file-button"
+              description={uploadFileTooltip}
+              disabled={isUploadDisabled}
+            />
+          )}
+        </FileUpload>
+        <SharePointPickerDialog
+          isOpen={isSharePointDialogOpen}
+          onOpenChange={setIsSharePointDialogOpen}
+          onFilesSelected={handleSharePointFilesSelected}
+          isDownloading={isProcessing}
+          downloadProgress={downloadProgress}
+          maxSelectionCount={endpointFileConfig?.fileLimit}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <FileUpload
@@ -319,7 +432,8 @@ const AttachFileMenu = ({
           className="overflow-visible"
           isOpen={isPopoverActive}
           setIsOpen={setIsPopoverActive}
-          modal={true}
+          modal={false}
+          portal={true}
           unmountOnHide={true}
           trigger={menuTrigger}
           items={dropdownItems}

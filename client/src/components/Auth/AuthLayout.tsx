@@ -77,7 +77,7 @@ function AuthLayout({
         <div className="w-authPageWidth overflow-hidden rounded-2xl border border-white/10 bg-white/90 px-6 py-4 shadow-2xl backdrop-blur-md dark:bg-gray-900/80 sm:max-w-md">
           {!hasStartupConfigError && !isFetching && header && (
             <h1
-              className="mb-4 text-center text-3xl font-semibold text-black dark:text-white"
+              className="mb-4 text-center text-3xl font-semibold text-text-primary"
               style={{ userSelect: 'none' }}
             >
               {header}
