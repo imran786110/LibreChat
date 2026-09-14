@@ -46,8 +46,14 @@ async function getCodeOutputDownloadStream(fileIdentifier, identity, req, route 
       url: `${baseURL}/download/${fileIdentifier}${query}`,
       responseType: 'stream',
       headers: {
-        'User-Agent': 'SheraliatAI/1.0',
-        'X-API-Key': apiKey,
+        'User-Agent': 'LibreChat/1.0',
+        ...authHeaders,
+        ...(route.executionProfile
+          ? codeExecutionHeaders({
+              executionProfile: route.executionProfile,
+              bridgeWorkerId: route.bridgeWorkerId,
+            })
+          : {}),
       },
       httpAgent: codeServerHttpAgent,
       httpsAgent: codeServerHttpsAgent,
@@ -207,7 +213,7 @@ async function uploadCodeEnvFile({
       headers: {
         ...form.getHeaders(),
         'Content-Type': 'multipart/form-data',
-        'User-Agent': 'SheraliatAI/1.0',
+        'User-Agent': 'LibreChat/1.0',
         'User-Id': req.user.id,
         ...authHeaders,
         ...(executionProfile ? codeExecutionHeaders({ executionProfile, bridgeWorkerId }) : {}),
