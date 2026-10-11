@@ -94,15 +94,20 @@ const getUserController = async (req, res) => {
   res.status(200).send(userData);
 };
 
+/** Consent is re-requested whenever POLICY_VERSION changes. */
+const getCurrentPolicyVersion = () => process.env.POLICY_VERSION || '2026-02-01';
+
 const getTermsStatusController = async (req, res) => {
   try {
-    const user = await db.getUserById(req.user.id, 'termsAccepted termsAcceptedAt');
+    const user = await db.getUserById(
+      req.user.id,
+      'termsAccepted consentPolicyVersion consentTimestamp',
+    );
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const currentPolicyVersion = process.env.POLICY_VERSION || '2026-02-01';
     const termsAccepted =
-      !!user.termsAccepted && user.consentPolicyVersion === currentPolicyVersion;
+      !!user.termsAccepted && user.consentPolicyVersion === getCurrentPolicyVersion();
     res.status(200).json({
       termsAccepted,
       consentPolicyVersion: user.consentPolicyVersion,
@@ -116,16 +121,12 @@ const getTermsStatusController = async (req, res) => {
 
 const acceptTermsController = async (req, res) => {
   try {
-    const currentPolicyVersion = process.env.POLICY_VERSION || '2026-02-01';
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      {
-        termsAccepted: true,
-        consentPolicyVersion: currentPolicyVersion,
-        consentTimestamp: new Date(),
-      },
-      { new: true },
-    );
+    const currentPolicyVersion = getCurrentPolicyVersion();
+    const user = await db.updateUser(req.user.id, {
+      termsAccepted: true,
+      consentPolicyVersion: currentPolicyVersion,
+      consentTimestamp: new Date(),
+    });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }

@@ -15,20 +15,21 @@ import {
   normalizeCodeHighlightThrottleMs,
 } from '~/components/Chat/Messages/Content/Parts/useLazyHighlight';
 import {
-  PromptGroupsProvider,
-  AssistantsMapContext,
-  AgentsMapContext,
-  SetConvoProvider,
-  FileMapContext,
-} from '~/Providers';
-import {
   useSearchEnabled,
   useAssistantsMap,
   useAuthContext,
   useCatalogWarmup,
   useAgentsMap,
   useFileMap,
+  useLocalize,
 } from '~/hooks';
+import {
+  PromptGroupsProvider,
+  AssistantsMapContext,
+  AgentsMapContext,
+  SetConvoProvider,
+  FileMapContext,
+} from '~/Providers';
 import KeyboardShortcutsDialog from '~/components/Nav/KeyboardShortcutsDialog';
 import KeyboardDeleteDialog from '~/components/Nav/KeyboardDeleteDialog';
 import { useUserTermsQuery, useGetStartupConfig } from '~/data-provider';
@@ -114,6 +115,7 @@ export default function Root() {
   const agentsMap = useAgentsMap({ isAuthenticated });
   const fileMap = useFileMap({ isAuthenticated });
 
+  const localize = useLocalize();
   const { data: config } = useGetStartupConfig();
   const { data: termsData } = useUserTermsQuery({
     enabled: isAuthenticated && config?.interface?.termsOfService?.modalAcceptance === true,
@@ -214,8 +216,8 @@ export default function Root() {
                 onOpenChange={setShowTerms}
                 onAccept={handleAcceptTerms}
                 onDecline={handleDeclineTerms}
-                title={config.interface.termsOfService.modalTitle}
-                modalContent={config.interface.termsOfService.modalContent}
+                title={localize('com_sheraliat_terms_modal_title')}
+                modalContent={localize('com_sheraliat_terms_modal_content')}
               />
             )}
           </AssistantsMapContext.Provider>

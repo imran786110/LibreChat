@@ -172,6 +172,7 @@ const {
   deleteUserController,
   getUserController,
   acceptTermsController,
+  getTermsStatusController,
   updateUserPluginsController,
   resendVerificationController,
   verifyEmailController,
@@ -179,7 +180,8 @@ const {
 const { Group } = require('~/db/models');
 const {
   deleteConvos,
-  acceptTerms,
+  updateUser,
+  getUserById,
   deleteUserById,
   deleteUserCodeEnvironments,
   deleteMessages,
@@ -430,39 +432,83 @@ describe('acceptTermsController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.POLICY_VERSION = '2026-10-01';
+  });
+
+  afterAll(() => {
+    delete process.env.POLICY_VERSION;
   });
 
   it('returns 404 when the user does not exist', async () => {
-    acceptTerms.mockResolvedValueOnce(null);
+    updateUser.mockResolvedValueOnce(null);
 
     await acceptTermsController({ user: { id: 'missing-user' } }, mockRes);
 
-    expect(acceptTerms).toHaveBeenCalledWith('missing-user');
     expect(mockRes.status).toHaveBeenCalledWith(404);
     expect(mockRes.json).toHaveBeenCalledWith({ message: 'User not found' });
   });
 
-  it('returns the recorded acceptance timestamp on success', async () => {
-    const acceptedAt = new Date('2026-06-14T10:00:00.000Z');
-    acceptTerms.mockResolvedValueOnce({ termsAccepted: true, termsAcceptedAt: acceptedAt });
+  it('records acceptance of the current policy version', async () => {
+    const consentTimestamp = new Date('2026-10-12T10:00:00.000Z');
+    updateUser.mockResolvedValueOnce({ termsAccepted: true, consentTimestamp });
 
     await acceptTermsController({ user: { id: 'user-id' } }, mockRes);
 
-    expect(acceptTerms).toHaveBeenCalledWith('user-id');
+    expect(updateUser).toHaveBeenCalledWith(
+      'user-id',
+      expect.objectContaining({ termsAccepted: true, consentPolicyVersion: '2026-10-01' }),
+    );
     expect(mockRes.status).toHaveBeenCalledWith(200);
     expect(mockRes.json).toHaveBeenCalledWith({
       message: 'Terms accepted successfully',
-      termsAcceptedAt: acceptedAt,
+      consentPolicyVersion: '2026-10-01',
+      consentTimestamp,
     });
   });
 
   it('returns 500 when the update throws', async () => {
-    acceptTerms.mockRejectedValueOnce(new Error('db down'));
+    updateUser.mockRejectedValueOnce(new Error('db down'));
 
     await acceptTermsController({ user: { id: 'user-id' } }, mockRes);
 
     expect(mockRes.status).toHaveBeenCalledWith(500);
     expect(mockRes.json).toHaveBeenCalledWith({ message: 'Error accepting terms' });
+  });
+});
+
+describe('getTermsStatusController', () => {
+  const mockRes = {
+    status: jest.fn().mockReturnThis(),
+    json: jest.fn().mockReturnThis(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.POLICY_VERSION = '2026-10-01';
+  });
+
+  afterAll(() => {
+    delete process.env.POLICY_VERSION;
+  });
+
+  it('reports acceptance when the stored version matches the current policy', async () => {
+    getUserById.mockResolvedValueOnce({ termsAccepted: true, consentPolicyVersion: '2026-10-01' });
+
+    await getTermsStatusController({ user: { id: 'user-id' } }, mockRes);
+
+    expect(getUserById).toHaveBeenCalledWith(
+      'user-id',
+      expect.stringContaining('consentPolicyVersion'),
+    );
+    expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ termsAccepted: true }));
+  });
+
+  it('asks again when the policy version changed since acceptance', async () => {
+    getUserById.mockResolvedValueOnce({ termsAccepted: true, consentPolicyVersion: '2026-02-01' });
+
+    await getTermsStatusController({ user: { id: 'user-id' } }, mockRes);
+
+    expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ termsAccepted: false }));
   });
 });
 
