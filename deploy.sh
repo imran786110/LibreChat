@@ -10,6 +10,7 @@ IMAGE="librechat:sheraliat-branding"
 COMPOSE_FILE="deploy-compose.yml"
 BRANCH="sheraliat-branding"
 REMOTE="origin"
+MIN_FREE_GB=8
 
 SKIP_PULL=false
 NO_CACHE=""
@@ -32,6 +33,13 @@ command -v docker >/dev/null 2>&1 || fail "docker not found"
 [ -f ".env" ]             || fail ".env file not found — copy .env.example and configure it"
 [ -f "librechat.yaml" ]   || fail "librechat.yaml not found — copy librechat.example.yaml and configure it"
 [ -f "$COMPOSE_FILE" ]    || fail "$COMPOSE_FILE not found"
+
+# A build that fills the disk takes MongoDB down with it (same volume as Docker's data)
+DOCKER_ROOT="$(docker info -f '{{.DockerRootDir}}')"
+FREE_GB=$(( $(df -Pk "$DOCKER_ROOT" | awk 'NR==2 {print $4}') / 1024 / 1024 ))
+[ "$FREE_GB" -ge "$MIN_FREE_GB" ] \
+  || fail "Only ${FREE_GB}GB free on $DOCKER_ROOT (need ${MIN_FREE_GB}GB) — run ./cleanup.sh first"
+log "Disk space OK: ${FREE_GB}GB free on $DOCKER_ROOT"
 
 # ── 2. Pull latest code ───────────────────────
 if [ "$SKIP_PULL" = false ]; then

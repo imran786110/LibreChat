@@ -35,7 +35,7 @@ else
   DANGLING=$(docker images -f "dangling=true" -q)
   if [ -n "$DANGLING" ]; then
     log "Removing dangling images..."
-    docker rmi $DANGLING
+    docker rmi $DANGLING || true
   else
     log "No dangling images found."
   fi
