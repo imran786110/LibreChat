@@ -60,10 +60,10 @@ function AuthLayout({
     <div className="auth-bg relative flex min-h-screen flex-col">
       <Banner />
       <BlinkAnimation active={isFetching}>
-        <div className="mt-8 flex w-full justify-center">
+        <div className="mt-10 flex w-full justify-center">
           <img
             src="assets/sheraliat-ai.png"
-            className="h-24 w-24 rounded-2xl object-contain drop-shadow-lg"
+            className="h-36 w-36 rounded-3xl object-contain drop-shadow-xl sm:h-48 sm:w-48"
             alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'Sheraliat AI' })}
           />
         </div>
