@@ -1,16 +1,26 @@
+import type { ResponsesApiRouting } from './types';
 import {
   Verbosity,
   ImageDetail,
+  ThinkingLevel,
+  ThinkingDisplay,
   EModelEndpoint,
   openAISettings,
   googleSettings,
+  getGoogleThinkingBudgetBounds,
+  Providers,
   ReasoningEffort,
   AnthropicEffort,
   ReasoningSummary,
+  ReasoningMode,
+  ReasoningContext,
   BedrockProviders,
   anthropicSettings,
 } from './types';
+import { hasAlwaysOnThinking, hasBetweenToolsThinkingFloor, supportsPromptCache } from './bedrock';
 import { SettingDefinition, SettingsConfiguration } from './generate';
+import { resolveEffectiveUseResponsesApi } from './file-config';
+import { gpt6Tier } from './families';
 
 // Base definitions
 const baseDefinitions: Record<string, SettingDefinition> = {
@@ -64,24 +74,6 @@ const baseDefinitions: Record<string, SettingDefinition> = {
     minTags: 0,
     maxTags: 4,
   },
-  imageDetail: {
-    key: 'imageDetail',
-    label: 'com_endpoint_plug_image_detail',
-    labelCode: true,
-    description: 'com_endpoint_openai_detail',
-    descriptionCode: true,
-    type: 'enum',
-    default: ImageDetail.auto,
-    component: 'slider',
-    options: [ImageDetail.low, ImageDetail.auto, ImageDetail.high],
-    enumMappings: {
-      [ImageDetail.low]: 'com_ui_low',
-      [ImageDetail.auto]: 'com_ui_auto',
-      [ImageDetail.high]: 'com_ui_high',
-    },
-    optionType: 'conversation',
-    columnSpan: 2,
-  },
 };
 
 const createDefinition = (
@@ -109,7 +101,7 @@ export const librechat = {
     labelCode: true,
     type: 'number',
     component: 'input',
-    placeholder: 'com_nav_theme_system',
+    placeholder: 'com_endpoint_default',
     placeholderCode: true,
     description: 'com_endpoint_context_info',
     descriptionCode: true,
@@ -140,13 +132,33 @@ export const librechat = {
     placeholderCode: true,
     optionType: 'model',
   } as const,
+  /** Controls how LibreChat encodes image content blocks, not a provider request
+   * parameter — so it belongs to this group and is stripped from model options. */
+  imageDetail: {
+    key: 'imageDetail',
+    label: 'com_endpoint_plug_image_detail',
+    labelCode: true,
+    description: 'com_endpoint_openai_detail',
+    descriptionCode: true,
+    type: 'enum',
+    default: ImageDetail.auto,
+    component: 'slider',
+    options: [ImageDetail.low, ImageDetail.auto, ImageDetail.high],
+    enumMappings: {
+      [ImageDetail.low]: 'com_ui_low',
+      [ImageDetail.auto]: 'com_ui_auto',
+      [ImageDetail.high]: 'com_ui_high',
+    },
+    optionType: 'conversation',
+    columnSpan: 2,
+  } as SettingDefinition,
   fileTokenLimit: {
     key: 'fileTokenLimit',
     label: 'com_ui_file_token_limit',
     labelCode: true,
     description: 'com_ui_file_token_limit_desc',
     descriptionCode: true,
-    placeholder: 'com_nav_theme_system',
+    placeholder: 'com_endpoint_default',
     placeholderCode: true,
     type: 'number',
     component: 'input',
@@ -219,7 +231,7 @@ const openAIParams: Record<string, SettingDefinition> = {
     component: 'input',
     description: 'com_endpoint_openai_max_tokens',
     descriptionCode: true,
-    placeholder: 'com_nav_theme_system',
+    placeholder: 'com_endpoint_default',
     placeholderCode: true,
     optionType: 'model',
     columnSpan: 2,
@@ -241,6 +253,7 @@ const openAIParams: Record<string, SettingDefinition> = {
       ReasoningEffort.medium,
       ReasoningEffort.high,
       ReasoningEffort.xhigh,
+      ReasoningEffort.max,
     ],
     enumMappings: {
       [ReasoningEffort.unset]: 'com_ui_auto',
@@ -250,6 +263,7 @@ const openAIParams: Record<string, SettingDefinition> = {
       [ReasoningEffort.medium]: 'com_ui_medium',
       [ReasoningEffort.high]: 'com_ui_high',
       [ReasoningEffort.xhigh]: 'com_ui_xhigh',
+      [ReasoningEffort.max]: 'com_ui_max',
     },
     optionType: 'model',
     columnSpan: 4,
@@ -304,6 +318,48 @@ const openAIParams: Record<string, SettingDefinition> = {
     optionType: 'model',
     columnSpan: 4,
   },
+  reasoning_mode: {
+    key: 'reasoning_mode',
+    label: 'com_endpoint_reasoning_mode',
+    labelCode: true,
+    description: 'com_endpoint_openai_reasoning_mode',
+    descriptionCode: true,
+    type: 'enum',
+    default: ReasoningMode.unset,
+    component: 'slider',
+    options: [ReasoningMode.unset, ReasoningMode.standard, ReasoningMode.pro],
+    enumMappings: {
+      [ReasoningMode.unset]: 'com_ui_unset',
+      [ReasoningMode.standard]: 'com_ui_standard',
+      [ReasoningMode.pro]: 'com_ui_pro',
+    },
+    optionType: 'model',
+    columnSpan: 4,
+  },
+  reasoning_context: {
+    key: 'reasoning_context',
+    label: 'com_endpoint_reasoning_context',
+    labelCode: true,
+    description: 'com_endpoint_openai_reasoning_context',
+    descriptionCode: true,
+    type: 'enum',
+    default: ReasoningContext.unset,
+    component: 'slider',
+    options: [
+      ReasoningContext.unset,
+      ReasoningContext.auto,
+      ReasoningContext.current_turn,
+      ReasoningContext.all_turns,
+    ],
+    enumMappings: {
+      [ReasoningContext.unset]: 'com_ui_unset',
+      [ReasoningContext.auto]: 'com_ui_auto',
+      [ReasoningContext.current_turn]: 'com_ui_current_turn',
+      [ReasoningContext.all_turns]: 'com_ui_all_turns',
+    },
+    optionType: 'model',
+    columnSpan: 4,
+  },
   verbosity: {
     key: 'verbosity',
     label: 'com_endpoint_verbosity',
@@ -347,7 +403,7 @@ const anthropic: Record<string, SettingDefinition> = {
     component: 'input',
     description: 'com_endpoint_anthropic_maxoutputtokens',
     descriptionCode: true,
-    placeholder: 'com_nav_theme_system',
+    placeholder: 'com_endpoint_default',
     placeholderCode: true,
     range: {
       min: anthropicSettings.maxOutputTokens.min,
@@ -401,6 +457,22 @@ const anthropic: Record<string, SettingDefinition> = {
     component: 'switch',
     optionType: 'conversation',
     showDefault: false,
+    columnSpan: 2,
+  },
+  promptCacheTtl: {
+    key: 'promptCacheTtl',
+    label: 'com_endpoint_prompt_cache_ttl',
+    labelCode: true,
+    description: 'com_endpoint_anthropic_prompt_cache_ttl',
+    descriptionCode: true,
+    type: 'enum',
+    default: anthropicSettings.promptCacheTtl.default,
+    options: ['5m', '1h'],
+    component: 'combobox',
+    optionType: 'conversation',
+    showDefault: false,
+    selectPlaceholder: 'com_endpoint_prompt_cache_ttl_default',
+    selectPlaceholderCode: true,
     columnSpan: 2,
   },
   thinking: {
@@ -461,7 +533,27 @@ const anthropic: Record<string, SettingDefinition> = {
       [AnthropicEffort.low]: 'com_ui_low',
       [AnthropicEffort.medium]: 'com_ui_medium',
       [AnthropicEffort.high]: 'com_ui_high',
+      [AnthropicEffort.xhigh]: 'com_ui_xhigh',
       [AnthropicEffort.max]: 'com_ui_max',
+    },
+    optionType: 'model',
+    columnSpan: 4,
+  },
+  thinkingDisplay: {
+    key: 'thinkingDisplay',
+    label: 'com_endpoint_anthropic_thinking_display',
+    labelCode: true,
+    description: 'com_endpoint_anthropic_thinking_display_desc',
+    descriptionCode: true,
+    type: 'enum',
+    default: anthropicSettings.thinkingDisplay.default,
+    component: 'slider',
+    options: anthropicSettings.thinkingDisplay.options,
+    enumMappings: {
+      [ThinkingDisplay.auto]: 'com_ui_auto',
+      [ThinkingDisplay.summarized]: 'com_ui_summarized',
+      [ThinkingDisplay.omitted]: 'com_ui_omitted',
+      [ThinkingDisplay.updates]: 'com_ui_updates',
     },
     optionType: 'model',
     columnSpan: 4,
@@ -501,7 +593,7 @@ const bedrock: Record<string, SettingDefinition> = {
     component: 'input',
     description: 'com_endpoint_anthropic_maxoutputtokens',
     descriptionCode: true,
-    placeholder: 'com_nav_theme_system',
+    placeholder: 'com_endpoint_default',
     placeholderCode: true,
     optionType: 'model',
     columnSpan: 2,
@@ -529,6 +621,46 @@ const bedrock: Record<string, SettingDefinition> = {
     optionType: 'conversation',
     showDefault: false,
     columnSpan: 2,
+  },
+  promptCacheTtl: {
+    key: 'promptCacheTtl',
+    label: 'com_endpoint_prompt_cache_ttl',
+    labelCode: true,
+    description: 'com_endpoint_anthropic_prompt_cache_ttl',
+    descriptionCode: true,
+    type: 'enum',
+    default: undefined,
+    options: ['5m', '1h'],
+    component: 'combobox',
+    optionType: 'conversation',
+    showDefault: false,
+    selectPlaceholder: 'com_endpoint_prompt_cache_ttl_default',
+    selectPlaceholderCode: true,
+    columnSpan: 2,
+  },
+  reasoning_effort: {
+    key: 'reasoning_effort',
+    label: 'com_endpoint_reasoning_effort',
+    labelCode: true,
+    description: 'com_endpoint_bedrock_reasoning_effort',
+    descriptionCode: true,
+    type: 'enum',
+    default: ReasoningEffort.unset,
+    component: 'slider',
+    options: [
+      ReasoningEffort.unset,
+      ReasoningEffort.low,
+      ReasoningEffort.medium,
+      ReasoningEffort.high,
+    ],
+    enumMappings: {
+      [ReasoningEffort.unset]: 'com_ui_off',
+      [ReasoningEffort.low]: 'com_ui_low',
+      [ReasoningEffort.medium]: 'com_ui_medium',
+      [ReasoningEffort.high]: 'com_ui_high',
+    },
+    optionType: 'model',
+    columnSpan: 4,
   },
 };
 
@@ -565,6 +697,16 @@ const meta: Record<string, SettingDefinition> = {
 };
 
 const google: Record<string, SettingDefinition> = {
+  /** Bounds the hand-rolled editor enforced through InputNumber, and they stay
+   *  scoped to this endpoint: the shared definition is rendered by every other
+   *  endpoint, whose own context windows may fall outside them. */
+  maxContextTokens: createDefinition(librechat.maxContextTokens, {
+    range: {
+      min: googleSettings.maxContextTokens.min,
+      max: googleSettings.maxContextTokens.max,
+      step: googleSettings.maxContextTokens.step,
+    },
+  }),
   temperature: createDefinition(baseDefinitions.temperature, {
     default: googleSettings.temperature.default,
     range: {
@@ -606,7 +748,7 @@ const google: Record<string, SettingDefinition> = {
     component: 'input',
     description: 'com_endpoint_google_maxoutputtokens',
     descriptionCode: true,
-    placeholder: 'com_nav_theme_system',
+    placeholder: 'com_endpoint_default',
     placeholderCode: true,
     default: googleSettings.maxOutputTokens.default,
     range: {
@@ -648,6 +790,32 @@ const google: Record<string, SettingDefinition> = {
     optionType: 'conversation',
     columnSpan: 2,
   },
+  thinkingLevel: {
+    key: 'thinkingLevel',
+    label: 'com_endpoint_thinking_level',
+    labelCode: true,
+    description: 'com_endpoint_google_thinking_level',
+    descriptionCode: true,
+    type: 'enum',
+    default: ThinkingLevel.unset,
+    component: 'slider',
+    options: [
+      ThinkingLevel.unset,
+      ThinkingLevel.minimal,
+      ThinkingLevel.low,
+      ThinkingLevel.medium,
+      ThinkingLevel.high,
+    ],
+    enumMappings: {
+      [ThinkingLevel.unset]: 'com_ui_auto',
+      [ThinkingLevel.minimal]: 'com_ui_minimal',
+      [ThinkingLevel.low]: 'com_ui_low',
+      [ThinkingLevel.medium]: 'com_ui_medium',
+      [ThinkingLevel.high]: 'com_ui_high',
+    },
+    optionType: 'conversation',
+    columnSpan: 4,
+  },
   web_search: {
     key: 'web_search',
     label: 'com_endpoint_use_search_grounding',
@@ -661,12 +829,25 @@ const google: Record<string, SettingDefinition> = {
     showDefault: false,
     columnSpan: 2,
   },
+  url_context: {
+    key: 'url_context',
+    label: 'com_endpoint_use_url_context',
+    labelCode: true,
+    description: 'com_endpoint_google_use_url_context',
+    descriptionCode: true,
+    type: 'boolean',
+    default: false,
+    component: 'switch',
+    optionType: 'model',
+    showDefault: false,
+    columnSpan: 2,
+  },
 };
 
 const googleConfig: SettingsConfiguration = [
   librechat.modelLabel,
   librechat.promptPrefix,
-  librechat.maxContextTokens,
+  google.maxContextTokens,
   google.maxOutputTokens,
   google.temperature,
   google.topP,
@@ -674,7 +855,9 @@ const googleConfig: SettingsConfiguration = [
   librechat.resendFiles,
   google.thinking,
   google.thinkingBudget,
+  google.thinkingLevel,
   google.web_search,
+  google.url_context,
   librechat.fileTokenLimit,
 ];
 
@@ -685,7 +868,7 @@ const googleCol1: SettingsConfiguration = [
 ];
 
 const googleCol2: SettingsConfiguration = [
-  librechat.maxContextTokens,
+  google.maxContextTokens,
   google.maxOutputTokens,
   google.temperature,
   google.topP,
@@ -693,7 +876,9 @@ const googleCol2: SettingsConfiguration = [
   librechat.resendFiles,
   google.thinking,
   google.thinkingBudget,
+  google.thinkingLevel,
   google.web_search,
+  google.url_context,
   librechat.fileTokenLimit,
 ];
 
@@ -708,14 +893,22 @@ const openAI: SettingsConfiguration = [
   openAIParams.presence_penalty,
   baseDefinitions.stop,
   librechat.resendFiles,
-  baseDefinitions.imageDetail,
+  librechat.imageDetail,
   openAIParams.web_search,
   openAIParams.reasoning_effort,
   openAIParams.useResponsesApi,
   openAIParams.reasoning_summary,
+  openAIParams.reasoning_mode,
+  openAIParams.reasoning_context,
   openAIParams.verbosity,
   openAIParams.disableStreaming,
   librechat.fileTokenLimit,
+];
+
+const openRouter: SettingsConfiguration = [
+  ...openAI,
+  anthropic.promptCache,
+  anthropic.promptCacheTtl,
 ];
 
 const openAICol1: SettingsConfiguration = [
@@ -733,9 +926,11 @@ const openAICol2: SettingsConfiguration = [
   openAIParams.presence_penalty,
   baseDefinitions.stop,
   librechat.resendFiles,
-  baseDefinitions.imageDetail,
+  librechat.imageDetail,
   openAIParams.reasoning_effort,
   openAIParams.reasoning_summary,
+  openAIParams.reasoning_mode,
+  openAIParams.reasoning_context,
   openAIParams.verbosity,
   openAIParams.useResponsesApi,
   openAIParams.web_search,
@@ -753,9 +948,11 @@ const anthropicConfig: SettingsConfiguration = [
   anthropic.topK,
   librechat.resendFiles,
   anthropic.promptCache,
+  anthropic.promptCacheTtl,
   anthropic.thinking,
   anthropic.thinkingBudget,
   anthropic.effort,
+  anthropic.thinkingDisplay,
   anthropic.web_search,
   librechat.fileTokenLimit,
 ];
@@ -774,9 +971,11 @@ const anthropicCol2: SettingsConfiguration = [
   anthropic.topK,
   librechat.resendFiles,
   anthropic.promptCache,
+  anthropic.promptCacheTtl,
   anthropic.thinking,
   anthropic.thinkingBudget,
   anthropic.effort,
+  anthropic.thinkingDisplay,
   anthropic.web_search,
   librechat.fileTokenLimit,
 ];
@@ -793,9 +992,11 @@ const bedrockAnthropic: SettingsConfiguration = [
   librechat.resendFiles,
   bedrock.region,
   bedrock.promptCache,
+  bedrock.promptCacheTtl,
   anthropic.thinking,
   anthropic.thinkingBudget,
   anthropic.effort,
+  anthropic.thinkingDisplay,
   librechat.fileTokenLimit,
 ];
 
@@ -832,6 +1033,7 @@ const bedrockGeneral: SettingsConfiguration = [
   librechat.resendFiles,
   bedrock.region,
   bedrock.promptCache,
+  bedrock.promptCacheTtl,
   librechat.fileTokenLimit,
 ];
 
@@ -851,9 +1053,11 @@ const bedrockAnthropicCol2: SettingsConfiguration = [
   librechat.resendFiles,
   bedrock.region,
   bedrock.promptCache,
+  bedrock.promptCacheTtl,
   anthropic.thinking,
   anthropic.thinkingBudget,
   anthropic.effort,
+  anthropic.thinkingDisplay,
   librechat.fileTokenLimit,
 ];
 
@@ -902,6 +1106,35 @@ const bedrockGeneralCol2: SettingsConfiguration = [
   librechat.resendFiles,
   bedrock.region,
   bedrock.promptCache,
+  bedrock.promptCacheTtl,
+  librechat.fileTokenLimit,
+];
+
+const bedrockZAI: SettingsConfiguration = [
+  librechat.modelLabel,
+  librechat.promptPrefix,
+  librechat.maxContextTokens,
+  meta.temperature,
+  meta.topP,
+  librechat.resendFiles,
+  bedrock.region,
+  bedrock.reasoning_effort,
+  librechat.fileTokenLimit,
+];
+
+const bedrockZAICol1: SettingsConfiguration = [
+  baseDefinitions.model as SettingDefinition,
+  librechat.modelLabel,
+  librechat.promptPrefix,
+];
+
+const bedrockZAICol2: SettingsConfiguration = [
+  librechat.maxContextTokens,
+  meta.temperature,
+  meta.topP,
+  librechat.resendFiles,
+  bedrock.region,
+  bedrock.reasoning_effort,
   librechat.fileTokenLimit,
 ];
 
@@ -917,6 +1150,7 @@ const bedrockMoonshot: SettingsConfiguration = [
   baseDefinitions.stop,
   librechat.resendFiles,
   bedrock.region,
+  bedrock.reasoning_effort,
   librechat.fileTokenLimit,
 ];
 
@@ -936,6 +1170,7 @@ const bedrockMoonshotCol2: SettingsConfiguration = [
   bedrock.topP,
   librechat.resendFiles,
   bedrock.region,
+  bedrock.reasoning_effort,
   librechat.fileTokenLimit,
 ];
 
@@ -943,6 +1178,7 @@ export const paramSettings: Record<string, SettingsConfiguration | undefined> = 
   [EModelEndpoint.openAI]: openAI,
   [EModelEndpoint.azureOpenAI]: openAI,
   [EModelEndpoint.custom]: openAI,
+  [Providers.OPENROUTER]: openRouter,
   [EModelEndpoint.anthropic]: anthropicConfig,
   [`${EModelEndpoint.bedrock}-${BedrockProviders.Anthropic}`]: bedrockAnthropic,
   [`${EModelEndpoint.bedrock}-${BedrockProviders.MistralAI}`]: bedrockMistral,
@@ -954,9 +1190,51 @@ export const paramSettings: Record<string, SettingsConfiguration | undefined> = 
   [`${EModelEndpoint.bedrock}-${BedrockProviders.Moonshot}`]: bedrockMoonshot,
   [`${EModelEndpoint.bedrock}-${BedrockProviders.MoonshotAI}`]: bedrockMoonshot,
   [`${EModelEndpoint.bedrock}-${BedrockProviders.OpenAI}`]: bedrockGeneral,
-  [`${EModelEndpoint.bedrock}-${BedrockProviders.ZAI}`]: bedrockGeneral,
+  [`${EModelEndpoint.bedrock}-${BedrockProviders.ZAI}`]: bedrockZAI,
   [EModelEndpoint.google]: googleConfig,
 };
+
+/**
+ * Maps effective backend param names for OpenAI-compatible/Azure endpoints (as deleted from
+ * `llmConfig` via `dropParams`, e.g. `maxTokens`) to their corresponding UI/conversation keys
+ * (e.g. `max_tokens`). Native providers (anthropic, google, bedrock, ...) already render these
+ * same camelCase names as their UI key (e.g. `topP`), so this alias must only be applied to
+ * OpenAI-compatible parameter sets — see `resolveDropParamsUIKeys`.
+ */
+const dropParamsBackendToUIKey: Record<string, string> = {
+  maxTokens: 'max_tokens',
+  topP: 'top_p',
+  frequencyPenalty: 'frequency_penalty',
+  presencePenalty: 'presence_penalty',
+};
+
+/** Endpoint keys whose parameter settings render the OpenAI-compatible (snake_case) UI keys. */
+const openAILikeParamEndpointKeys: Set<string> = new Set([
+  EModelEndpoint.openAI,
+  EModelEndpoint.azureOpenAI,
+  EModelEndpoint.custom,
+  Providers.OPENROUTER,
+]);
+
+/**
+ * Normalizes an admin-configured `dropParams` list into the UI/conversation keys used to hide
+ * the matching controls in the settings panels. `endpointKey` should be the same key used to
+ * resolve the panel's parameter settings (e.g. `overriddenEndpointKey`); the backend-name alias
+ * is only applied for OpenAI-compatible endpoints, since native providers (anthropic, google,
+ * bedrock, ...) already use these backend names as their UI key.
+ */
+export function resolveDropParamsUIKeys(
+  dropParams: string[] | undefined,
+  endpointKey: string,
+): Set<string> {
+  if (!dropParams || dropParams.length === 0) {
+    return new Set();
+  }
+  if (!openAILikeParamEndpointKeys.has(endpointKey)) {
+    return new Set(dropParams);
+  }
+  return new Set(dropParams.map((param) => dropParamsBackendToUIKey[param] ?? param));
+}
 
 const openAIColumns = {
   col1: openAICol1,
@@ -979,6 +1257,10 @@ export const presetSettings: Record<
   [EModelEndpoint.openAI]: openAIColumns,
   [EModelEndpoint.azureOpenAI]: openAIColumns,
   [EModelEndpoint.custom]: openAIColumns,
+  [Providers.OPENROUTER]: {
+    col1: openAICol1,
+    col2: [...openAICol2, anthropic.promptCache, anthropic.promptCacheTtl],
+  },
   [EModelEndpoint.anthropic]: {
     col1: anthropicCol1,
     col2: anthropicCol2,
@@ -1008,7 +1290,10 @@ export const presetSettings: Record<
     col2: bedrockMoonshotCol2,
   },
   [`${EModelEndpoint.bedrock}-${BedrockProviders.OpenAI}`]: bedrockGeneralColumns,
-  [`${EModelEndpoint.bedrock}-${BedrockProviders.ZAI}`]: bedrockGeneralColumns,
+  [`${EModelEndpoint.bedrock}-${BedrockProviders.ZAI}`]: {
+    col1: bedrockZAICol1,
+    col2: bedrockZAICol2,
+  },
   [EModelEndpoint.google]: {
     col1: googleCol1,
     col2: googleCol2,
@@ -1023,3 +1308,112 @@ export const agentParamSettings: Record<string, SettingsConfiguration | undefine
   }
   return acc;
 }, {});
+
+/**
+ * Resolves model-aware defaults for a settings configuration before rendering.
+ * Google's `maxOutputTokens` default depends on the selected Gemini model so that
+ * current models (2.5 and 3+) surface their 64K output limit instead of the legacy 8K value.
+ * Anthropic prompt-cache controls are only surfaced for models that support them.
+ */
+export function applyModelAwareDefaults(
+  settings: SettingsConfiguration,
+  endpoint: string,
+  model?: string,
+  responsesApiRouting?: ResponsesApiRouting,
+): SettingsConfiguration {
+  if (!model) {
+    return settings;
+  }
+  if (/^grok-4[.-]7(?:$|[-:])/.test(model.split('/').pop() ?? '')) {
+    return settings.map((setting) =>
+      setting.key === 'reasoning_effort'
+        ? {
+            ...setting,
+            options: [
+              ReasoningEffort.unset,
+              ReasoningEffort.low,
+              ReasoningEffort.medium,
+              ReasoningEffort.high,
+              ReasoningEffort.xhigh,
+            ],
+          }
+        : setting,
+    );
+  }
+  const tier = gpt6Tier(model);
+  if (tier === 'sol' || tier === 'luna') {
+    return settings.map((setting) => {
+      if (setting.key === 'reasoning_effort') {
+        return {
+          ...setting,
+          options: setting.options?.filter((effort) => effort !== ReasoningEffort.minimal),
+        };
+      }
+      /** Match the native backend's unset default without writing into stored
+       * settings. Explicit false still overrides this rendered default. */
+      if (setting.key === 'useResponsesApi') {
+        const route = (value?: boolean) =>
+          resolveEffectiveUseResponsesApi({ endpoint, model, routing: responsesApiRouting, value });
+        return {
+          ...setting,
+          default: route() ?? false,
+          enumMappings: { true: route(true) ?? true, false: route(false) ?? false },
+        };
+      }
+      return setting;
+    });
+  }
+  if (hasAlwaysOnThinking(model)) {
+    return settings.filter(
+      (setting) =>
+        !['thinking', 'thinkingBudget', 'temperature', 'topP', 'topK'].includes(setting.key),
+    );
+  }
+  /** Sonnet 5.5+ keeps the toggle: "off" maps to its `between_tools` floor. */
+  if (hasBetweenToolsThinkingFloor(model)) {
+    return settings
+      .map((setting) =>
+        setting.key === 'thinking'
+          ? { ...setting, description: 'com_endpoint_anthropic_thinking_between_tools' }
+          : setting,
+      )
+      .filter(
+        (setting) => !['thinkingBudget', 'temperature', 'topP', 'topK'].includes(setting.key),
+      );
+  }
+  const modelAwareSettings =
+    endpoint === EModelEndpoint.google
+      ? settings.map((setting) => {
+          if (setting.key === 'maxOutputTokens') {
+            return { ...setting, default: googleSettings.maxOutputTokens.reset(model) };
+          }
+          /** The shared thinking budget range is model-agnostic, so it caps Pro below
+           *  its real ceiling and accepts Flash values the provider rejects. The
+           *  maximum and the positive floor move together. `range.min` stays -1 so
+           *  the "decide automatically" sentinel remains typeable. */
+          if (setting.key === 'thinkingBudget' && setting.range != null) {
+            const bounds = getGoogleThinkingBudgetBounds(model);
+            if (bounds != null) {
+              return {
+                ...setting,
+                range: {
+                  ...setting.range,
+                  max: bounds.max,
+                  positiveMin: bounds.min,
+                  modelSpecific: true,
+                },
+              };
+            }
+          }
+          return setting;
+        })
+      : settings;
+
+  if (endpoint !== EModelEndpoint.anthropic || supportsPromptCache(model)) {
+    return modelAwareSettings;
+  }
+
+  return modelAwareSettings.filter(
+    (setting) => setting.key !== 'promptCache' && setting.key !== 'promptCacheTtl',
+  );
+}

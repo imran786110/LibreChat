@@ -4,10 +4,10 @@ const path = require('path');
 const axios = require('axios');
 const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
-const { Tool } = require('@langchain/core/tools');
 const { logger } = require('@librechat/data-schemas');
+const { Tool } = require('@librechat/agents/langchain/tools');
 const { FileContext, ContentTypes } = require('librechat-data-provider');
-const { getBasePath } = require('@librechat/api');
+const { applySSRFSafeAgentIfDirect, getBasePath } = require('@librechat/api');
 const paths = require('~/config/paths');
 
 const stableDiffusionJsonSchema = {
@@ -43,6 +43,10 @@ class StableDiffusionAPI extends Tool {
     this.returnMetadata = fields.returnMetadata ?? false;
     /** @type {boolean} */
     this.isAgent = fields.isAgent;
+    if (this.isAgent) {
+      /** Ensures LangChain maps [content, artifact] tuple to ToolMessage fields instead of serializing it into content. */
+      this.responseFormat = 'content_and_artifact';
+    }
     if (fields.uploadImageBuffer) {
       /** @type {uploadImageBuffer} Necessary for output to contain all image metadata. */
       this.uploadImageBuffer = fields.uploadImageBuffer.bind(this);
@@ -50,6 +54,7 @@ class StableDiffusionAPI extends Tool {
 
     this.name = 'stable-diffusion';
     this.url = fields.SD_WEBUI_URL || this.getServerURL();
+    this.isUserProvidedEndpoint = fields.userProvidedAuthFields?.has('SD_WEBUI_URL') === true;
     this.description_for_model = `// Generate images and visuals using text.
 // Guidelines:
 // - ALWAYS use {{"prompt": "7+ detailed keywords", "negative_prompt": "7+ detailed keywords"}} structure for queries.
@@ -112,10 +117,14 @@ class StableDiffusionAPI extends Tool {
     };
     let generationResponse;
     try {
-      generationResponse = await axios.post(`${url}/sdapi/v1/txt2img`, payload);
+      const requestUrl = `${url}/sdapi/v1/txt2img`;
+      const requestConfig = this.isUserProvidedEndpoint
+        ? applySSRFSafeAgentIfDirect({}, requestUrl)
+        : undefined;
+      generationResponse = await axios.post(requestUrl, payload, requestConfig);
     } catch (error) {
       logger.error('[StableDiffusion] Error while generating image:', error);
-      return 'Error making API request.';
+      return this.returnValue('Error making API request.');
     }
     const image = generationResponse.data.images[0];
 

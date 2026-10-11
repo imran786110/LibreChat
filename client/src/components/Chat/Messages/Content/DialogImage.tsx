@@ -1,17 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { PanelLeftOpen, PanelLeftClose } from 'lucide';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Button, TooltipAnchor } from '@librechat/client';
-import { X, ArrowDownToLine, PanelLeftOpen, PanelLeftClose, RotateCcw } from 'lucide-react';
+import { X, ArrowDownToLine, RotateCcw } from 'lucide-react';
+import { Button, MorphIcon, TooltipAnchor } from '@librechat/client';
 import { useLocalize } from '~/hooks';
+
+const imageSizeCache = new Map<string, string>();
 
 const getQualityStyles = (quality: string): string => {
   if (quality === 'high') {
-    return 'bg-green-100 text-green-800';
+    return 'bg-status-success-subtle text-status-success';
   }
   if (quality === 'low') {
-    return 'bg-orange-100 text-orange-800';
+    return 'bg-status-warning-subtle text-status-warning';
   }
-  return 'bg-gray-100 text-gray-800';
+  return 'bg-status-neutral-subtle text-status-neutral';
 };
 
 export default function DialogImage({
@@ -50,18 +53,26 @@ export default function DialogImage({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const getImageSize = useCallback(async (url: string) => {
+    const cached = imageSizeCache.get(url);
+    if (cached) {
+      return cached;
+    }
     try {
       const response = await fetch(url, { method: 'HEAD' });
       const contentLength = response.headers.get('Content-Length');
 
       if (contentLength) {
         const bytes = parseInt(contentLength, 10);
-        return formatFileSize(bytes);
+        const result = formatFileSize(bytes);
+        imageSizeCache.set(url, result);
+        return result;
       }
 
       const fullResponse = await fetch(url);
       const blob = await fullResponse.blob();
-      return formatFileSize(blob.size);
+      const result = formatFileSize(blob.size);
+      imageSizeCache.set(url, result);
+      return result;
     } catch (error) {
       console.error('Error getting image size:', error);
       return null;
@@ -318,11 +329,10 @@ export default function DialogImage({
                   className="h-10 w-10 p-0 text-white hover:bg-white/10"
                   aria-label={imageDetailsLabel}
                 >
-                  {isPromptOpen ? (
-                    <PanelLeftOpen className="size-5" aria-hidden="true" />
-                  ) : (
-                    <PanelLeftClose className="size-5" aria-hidden="true" />
-                  )}
+                  <MorphIcon
+                    icon={isPromptOpen ? PanelLeftOpen : PanelLeftClose}
+                    className="size-5"
+                  />
                 </Button>
               }
             />
@@ -355,6 +365,7 @@ export default function DialogImage({
                   ref={imageRef}
                   src={src}
                   alt="Image"
+                  decoding="async"
                   className="block max-h-[85vh] object-contain"
                   style={{
                     maxWidth: getImageMaxWidth(),
