@@ -110,9 +110,9 @@ const failedControlLocaleKey = (reason?: string) => {
 };
 
 export default function SubagentThreadPanel({ selection }: { selection: ActiveSubagentPanel }) {
-  /** `present` carries the remembered answer while the config is in flight, so
-   *  this surface lays out once, like the composer beside it. */
-  const clearsFooter = useConfiguredFooter().present;
+  /** The shell carries the deployment's answer, so this surface lays out once,
+   *  like the composer beside it. */
+  const clearsFooter = useConfiguredFooter();
   const localize = useLocalize();
   const panelStore = useStore();
   const { showToast } = useToastContext();
@@ -1128,7 +1128,7 @@ export default function SubagentThreadPanel({ selection }: { selection: ActiveSu
         key: 'steer',
         label: localize('com_ui_steer'),
         kbd: steerKbd,
-        icon: <Zap className="h-4 w-4 text-status-warning" aria-hidden="true" />,
+        icon: <Zap className="text-status-warning h-4 w-4" aria-hidden="true" />,
         disabled: blocked,
         onClick: () => submitControl('steer'),
       },
@@ -1136,7 +1136,7 @@ export default function SubagentThreadPanel({ selection }: { selection: ActiveSu
         key: 'queue',
         label: localize('com_ui_queue'),
         kbd: modEnter === 'other' ? modSymbol : undefined,
-        icon: <Clock className="h-4 w-4 text-status-info" aria-hidden="true" />,
+        icon: <Clock className="text-status-info h-4 w-4" aria-hidden="true" />,
         disabled: blocked,
         onClick: () => submitControl('queue'),
       },
@@ -1144,7 +1144,7 @@ export default function SubagentThreadPanel({ selection }: { selection: ActiveSu
         key: 'interrupt',
         label: localize('com_ui_subagent_interrupt'),
         kbd: altEnter === 'interrupt' ? altSymbol : undefined,
-        icon: <OctagonPause className="h-4 w-4 text-status-error" aria-hidden="true" />,
+        icon: <OctagonPause className="text-status-error h-4 w-4" aria-hidden="true" />,
         disabled: blocked,
         onClick: () => submitControl('interrupt'),
       },
@@ -1394,7 +1394,7 @@ export default function SubagentThreadPanel({ selection }: { selection: ActiveSu
           thread and fades into it, so the conversation scrolls under it and
           more of it is on screen. Gradient stops track THIS surface rather
           than the chat's, since the panel sits on its own background. */}
-      <header className="absolute top-0 z-10 flex h-[52px] w-full items-center gap-2 bg-gradient-to-b from-surface-primary-alt via-surface-primary-alt/70 to-transparent p-2 font-semibold text-text-primary">
+      <header className="via-surface-primary-alt/70 absolute top-0 z-10 flex h-[52px] w-full items-center gap-2 bg-gradient-to-b from-surface-primary-alt to-transparent p-2 font-semibold text-text-primary">
         {actorOptions.length > 1 ? (
           /* The agent builder's picker, so switching actors here reads as the
              same control as every other agent selection in the app — avatar,

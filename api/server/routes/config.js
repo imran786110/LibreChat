@@ -13,6 +13,8 @@ const {
   isFileSnapshotEnabled,
   getEndpointsDropParamsMap,
   resolveCodeEnvironmentDecisionVersion,
+  resolveCodeEnvironmentMoveCapabilities,
+  resolveCodeEnvironmentTransitionVersion,
 } = require('@librechat/api');
 const { EModelEndpoint, defaultSocialLogins } = require('librechat-data-provider');
 const { logger, getTenantId, SystemCapabilities } = require('@librechat/data-schemas');
@@ -71,7 +73,7 @@ function buildPreLoginPayload() {
 
   /** @type {Partial<TStartupConfig>} */
   const payload = {
-    appTitle: process.env.APP_TITLE || 'LibreChat',
+    appTitle: process.env.APP_TITLE || process.env.BRAND_NAME || 'Sheraliat AI',
     discordLoginEnabled: !!process.env.DISCORD_CLIENT_ID && !!process.env.DISCORD_CLIENT_SECRET,
     facebookLoginEnabled: !!process.env.FACEBOOK_CLIENT_ID && !!process.env.FACEBOOK_CLIENT_SECRET,
     githubLoginEnabled: !!process.env.GITHUB_CLIENT_ID && !!process.env.GITHUB_CLIENT_SECRET,
@@ -143,7 +145,7 @@ function buildPostLoginPayload() {
       isBirthday() ||
       isEnabled(process.env.SHOW_BIRTHDAY_ICON) ||
       process.env.SHOW_BIRTHDAY_ICON === '',
-    helpAndFaqURL: process.env.HELP_AND_FAQ_URL || 'https://librechat.ai',
+    helpAndFaqURL: process.env.HELP_AND_FAQ_URL || '/impressum',
     sharedLinksEnabled,
     publicSharedLinksEnabled,
     openidReuseTokens,
@@ -253,6 +255,8 @@ router.get('/', async function (req, res) {
     const codeEnvironmentDecisionVersion = resolveCodeEnvironmentDecisionVersion(
       process.env.CODE_ENVIRONMENT_DECISION_VERSION,
     );
+    const codeEnvironmentMoveCapabilities = resolveCodeEnvironmentMoveCapabilities(appConfig);
+    const codeEnvironmentTransitionVersion = resolveCodeEnvironmentTransitionVersion(appConfig);
 
     const endpointsDropParamsMap = getEndpointsDropParamsMap(appConfig?.endpoints);
 
@@ -287,40 +291,11 @@ router.get('/', async function (req, res) {
 
     /** @type {TStartupConfig} */
     const payload = {
-      appTitle: process.env.APP_TITLE || process.env.BRAND_NAME || 'Sheraliat AI',
+      ...preLoginPayload,
+      ...publicSharePayload,
+      ...buildPostLoginPayload(),
+      sharedLinksSnapshotFilesEnabled: sharedLinksEnabled && isFileSnapshotEnabled(appConfig),
       socialLogins: appConfig?.registration?.socialLogins ?? defaultSocialLogins,
-      discordLoginEnabled: !!process.env.DISCORD_CLIENT_ID && !!process.env.DISCORD_CLIENT_SECRET,
-      facebookLoginEnabled:
-        !!process.env.FACEBOOK_CLIENT_ID && !!process.env.FACEBOOK_CLIENT_SECRET,
-      githubLoginEnabled: !!process.env.GITHUB_CLIENT_ID && !!process.env.GITHUB_CLIENT_SECRET,
-      googleLoginEnabled: !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET,
-      appleLoginEnabled:
-        !!process.env.APPLE_CLIENT_ID &&
-        !!process.env.APPLE_TEAM_ID &&
-        !!process.env.APPLE_KEY_ID &&
-        !!process.env.APPLE_PRIVATE_KEY_PATH,
-      openidLoginEnabled: isOpenIdEnabled,
-      openidLabel: process.env.OPENID_BUTTON_LABEL || 'Continue with OpenID',
-      openidImageUrl: process.env.OPENID_IMAGE_URL,
-      openidAutoRedirect: isEnabled(process.env.OPENID_AUTO_REDIRECT),
-      samlLoginEnabled: !isOpenIdEnabled && isSamlEnabled,
-      samlLabel: process.env.SAML_BUTTON_LABEL,
-      samlImageUrl: process.env.SAML_IMAGE_URL,
-      serverDomain: process.env.DOMAIN_SERVER || 'http://localhost:3080',
-      emailLoginEnabled,
-      registrationEnabled: !ldap?.enabled && isEnabled(process.env.ALLOW_REGISTRATION),
-      socialLoginEnabled: isEnabled(process.env.ALLOW_SOCIAL_LOGIN),
-      emailEnabled:
-        (!!process.env.EMAIL_SERVICE || !!process.env.EMAIL_HOST) &&
-        !!process.env.EMAIL_USERNAME &&
-        !!process.env.EMAIL_PASSWORD &&
-        !!process.env.EMAIL_FROM,
-      passwordResetEnabled,
-      showBirthdayIcon:
-        isBirthday() ||
-        isEnabled(process.env.SHOW_BIRTHDAY_ICON) ||
-        process.env.SHOW_BIRTHDAY_ICON === '',
-      helpAndFaqURL: process.env.HELP_AND_FAQ_URL || '/impressum',
       interface: appConfig?.interfaceConfig,
       titleGenerationTiming: resolveTitleTiming({
         appConfig,
@@ -343,6 +318,8 @@ router.get('/', async function (req, res) {
       insightsEnabled: isEnabled(process.env.ENABLE_INSIGHTS),
       compactionEnabled: appConfig?.summarization?.enabled !== false,
       ...(codeEnvironmentDecisionVersion != null ? { codeEnvironmentDecisionVersion } : {}),
+      ...codeEnvironmentMoveCapabilities,
+      ...(codeEnvironmentTransitionVersion != null ? { codeEnvironmentTransitionVersion } : {}),
       ...(cloudFront ? { cloudFront } : {}),
       ...(rum ? { rum } : {}),
       fileUploadSseEnabled: isEnabled(process.env.FILE_UPLOAD_SSE_ENABLED),

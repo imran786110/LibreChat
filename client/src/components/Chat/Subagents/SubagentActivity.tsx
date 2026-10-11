@@ -80,12 +80,27 @@ function SubagentControlHistory({
             key={control.invocationId}
             className="rounded-lg border border-border-light bg-surface-secondary px-3 py-2 text-sm"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <StatusIcon size={14} aria-hidden className="shrink-0 text-text-secondary" />
-              <span className="font-medium">{localize(CONTROL_ACTION_LABELS[control.action])}</span>
-              <span className="ml-auto text-xs text-text-secondary" aria-live="polite">
+              <span className="min-w-0 flex-1 font-medium">
+                {localize(CONTROL_ACTION_LABELS[control.action])}
+              </span>
+              <span className="ml-auto shrink-0 text-xs text-text-secondary" aria-live="polite">
                 {localize(CONTROL_STATUS_LABELS[control.status])}
               </span>
+              {control.status === 'accepted' &&
+                control.controlId != null &&
+                onCancelControl != null && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 px-2 text-xs"
+                    onClick={() => onCancelControl(control.controlId as string)}
+                  >
+                    {localize('com_ui_subagent_control_withdraw')}
+                  </Button>
+                )}
             </div>
             {control.message != null && control.message !== '' && (
               <div className="mt-1 break-words text-text-secondary">
@@ -98,26 +113,13 @@ function SubagentControlHistory({
               </div>
             )}
             {control.reason != null && (
-              <div className="mt-1 text-xs text-status-error">
+              <div className="text-status-error mt-1 text-xs">
                 {localize(
                   CONTROL_REASON_LABELS[control.reason] ??
                     'com_ui_subagent_control_reason_invalid_command',
                 )}
               </div>
             )}
-            {control.status === 'accepted' &&
-              control.controlId != null &&
-              onCancelControl != null && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="mt-1 h-7 px-2 text-xs"
-                  onClick={() => onCancelControl(control.controlId as string)}
-                >
-                  {localize('com_ui_subagent_control_withdraw')}
-                </Button>
-              )}
           </div>
         );
       })}
@@ -248,6 +250,16 @@ const toContentPart = (item: ChildActivityItem): TMessageContentParts => {
       output: item.output ?? '',
       progress: item.status === 'running' ? 0.1 : 1,
       ...(item.status === 'running' ? {} : { runStepStatus: item.status }),
+      ...(item.toolPreparationStartedAt == null
+        ? {}
+        : { toolPreparationStartedAt: item.toolPreparationStartedAt }),
+      ...(item.toolDispatchedAt == null ? {} : { toolDispatchedAt: item.toolDispatchedAt }),
+      ...(item.toolPreparationDurationMs == null
+        ? {}
+        : { toolPreparationDurationMs: item.toolPreparationDurationMs }),
+      ...(item.toolExecutionDurationMs == null
+        ? {}
+        : { toolExecutionDurationMs: item.toolExecutionDurationMs }),
       ...(item.inputValidationError === true ? { inputValidationError: true } : {}),
       ...(item.approval == null ? {} : { approval: item.approval }),
     },
@@ -338,7 +350,7 @@ export function SubagentActivityContent({
     );
   } else if (state === 'error') {
     body = (
-      <div className="rounded-lg border border-status-error-border bg-status-error-subtle p-3 text-sm text-status-error">
+      <div className="border-status-error-border bg-status-error-subtle text-status-error rounded-lg border p-3 text-sm">
         {localize('com_ui_subagent_thread_load_error')}
       </div>
     );
@@ -359,6 +371,7 @@ export function SubagentActivityContent({
         isSubmitting={isSubmitting}
         showThinking={showThinking}
         isLatestMessage={isSubmitting}
+        foldLiveActivity={false}
       />
     );
   }

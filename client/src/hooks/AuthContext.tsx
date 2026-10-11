@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useRecoilState, useSetRecoilState } from 'recoil';
 import {
   apiBaseUrl,
+  ErrorTypes,
   SystemRoles,
   setTokenHeader,
   isSystemRoleName,
@@ -21,9 +22,10 @@ import {
 import type * as t from 'librechat-data-provider';
 import type { ReactNode } from 'react';
 import {
-  SESSION_KEY,
   isSafeRedirect,
   getPostLoginRedirect,
+  dropStoredRedirect,
+  readStoredRedirect,
   clearComposerDraftStorage,
   clearRetainedFileDeletions,
   openFileDeletionRetention,
@@ -146,7 +148,8 @@ const AuthContextProvider = ({
     },
     onError: (error: TResError | unknown) => {
       const resError = error as TResError;
-      doSetError(resError.message);
+      const code = resError.response?.data?.code;
+      doSetError(code === ErrorTypes.AUTH_CROSS_ORIGIN ? code : resError.message);
       // Preserve a valid redirect_to across login failures so the deep link survives retries.
       // Cannot use buildLoginRedirectUrl() here — it reads the current pathname (already /login)
       // and would return plain /login, dropping the redirect_to destination.
@@ -222,8 +225,8 @@ const AuthContextProvider = ({
         }
         const { user, token = '' } = data ?? {};
         if (token) {
-          const storedRedirect = sessionStorage.getItem(SESSION_KEY);
-          sessionStorage.removeItem(SESSION_KEY);
+          const storedRedirect = readStoredRedirect();
+          dropStoredRedirect();
           const baseUrl = apiBaseUrl();
           const rawPath = window.location.pathname;
           const strippedPath =

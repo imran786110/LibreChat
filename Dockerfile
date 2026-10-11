@@ -1,12 +1,17 @@
 # Sheraliat AI - Multi-stage Docker Build
-# Based on LibreChat v0.8.2
+# Based on LibreChat v0.8.8
 
 # ── Stage 1: Builder ──────────────────────────────────────────
 FROM node:24-alpine AS builder
 
 RUN apk add --no-cache python3 py3-pip
 
+# Disable dependency installation analytics before any npm lifecycle scripts run.
+ENV SCARF_ANALYTICS=false
+
 ARG NODE_MAX_OLD_SPACE_SIZE=3072
+ARG NPM_CI_TIMEOUT_SECONDS=1500
+ARG NPM_CI_ATTEMPTS=2
 
 RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
@@ -64,7 +69,7 @@ LABEL org.opencontainers.image.title="Sheraliat AI" \
       org.opencontainers.image.description="German-hosted, branded fork of LibreChat" \
       org.opencontainers.image.vendor="Your Company" \
       org.opencontainers.image.source="https://github.com/your-org/sheraliat-ai" \
-      org.opencontainers.image.version="0.8.2"
+      org.opencontainers.image.version="0.8.8"
 
 # Install runtime dependencies
 RUN apk add --no-cache jemalloc wget python3 py3-pip uv tini

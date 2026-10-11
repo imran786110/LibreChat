@@ -26,12 +26,14 @@ import type {
 } from 'librechat-data-provider';
 import { useRegenerateBackupCodesMutation } from '~/data-provider';
 import { useAuthContext, useLocalize } from '~/hooks';
+import { useTwoFactorError } from './errors';
 import store from '~/store';
 
 const BackupCodesItem: React.FC = () => {
   const localize = useLocalize();
   const { user } = useAuthContext();
   const { showToast } = useToastContext();
+  const showError = useTwoFactorError();
   const setUser = useSetRecoilState(store.user);
   const [isDialogOpen, setDialogOpen] = useState<boolean>(false);
   const [otpToken, setOtpToken] = useState('');
@@ -69,11 +71,7 @@ const BackupCodesItem: React.FC = () => {
           URL.revokeObjectURL(url);
         }
       },
-      onError: () =>
-        showToast({
-          message: localize('com_ui_backup_codes_regenerate_error'),
-          status: 'error',
-        }),
+      onError: (error) => showError(error, 'com_ui_backup_codes_regenerate_error'),
     });
   };
 
@@ -110,7 +108,7 @@ const BackupCodesItem: React.FC = () => {
           >
             {Array.isArray(user?.backupCodes) && user?.backupCodes.length > 0 ? (
               <>
-                <div className="mb-6 rounded-lg border border-status-warning-border bg-status-warning-subtle p-4">
+                <div className="border-status-warning-border bg-status-warning-subtle mb-6 rounded-lg border p-4">
                   <p className="text-sm text-text-secondary">
                     {localize('com_ui_backup_codes_security_info')}
                   </p>
