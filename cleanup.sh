@@ -20,6 +20,8 @@ set -euo pipefail
 CURRENT_TAG="sheraliat-branding"
 # Build cache kept for fast rebuilds; override with BUILD_CACHE_KEEP_GB=N ./cleanup.sh
 BUILD_CACHE_KEEP_GB="${BUILD_CACHE_KEEP_GB:-6}"
+# Cache used this recently is always kept (protects the latest build's layers)
+BUILD_CACHE_KEEP_RECENT="${BUILD_CACHE_KEEP_RECENT:-24h}"
 
 AGGRESSIVE=false
 for arg in "$@"; do
@@ -73,9 +75,17 @@ else
   if docker builder prune --help 2>/dev/null | grep -q -- '--reserved-space'; then
     KEEP_FLAG="--reserved-space"
   fi
-  log "Trimming Docker build cache to ${BUILD_CACHE_KEEP_GB}GB..."
-  docker builder prune -a -f "$KEEP_FLAG" "${BUILD_CACHE_KEEP_GB}GB"
+  # Cache used within BUILD_CACHE_KEEP_RECENT is never pruned, so the build
+  # that just ran stays whole even when it alone exceeds the budget; older
+  # cache is trimmed until the total fits BUILD_CACHE_KEEP_GB
+  log "Trimming Docker build cache older than ${BUILD_CACHE_KEEP_RECENT} to ${BUILD_CACHE_KEEP_GB}GB..."
+  docker builder prune -a -f \
+    --filter "until=${BUILD_CACHE_KEEP_RECENT}" \
+    "$KEEP_FLAG" "${BUILD_CACHE_KEEP_GB}GB"
 fi
+
+log "Docker disk usage:"
+docker system df
 
 log "─────────────────────────────────────"
 log "Disk usage after cleanup ($DOCKER_ROOT):"

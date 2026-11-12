@@ -79,7 +79,10 @@ fi
 # ── 3. Build Docker image ─────────────────────
 # BuildKit is required for the Dockerfile's cache mounts (default since Docker 23)
 log "Building Docker image: $IMAGE ..."
+# --progress=plain prints each step once with its duration (and CACHED when
+# reused) instead of a redrawn TTY display, so slow steps are visible in logs
 DOCKER_BUILDKIT=1 docker build $NO_CACHE \
+  --progress=plain \
   --build-arg NODE_MAX_OLD_SPACE_SIZE=3072 \
   -t "$IMAGE" \
   -f Dockerfile \
