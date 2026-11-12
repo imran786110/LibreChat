@@ -75,10 +75,6 @@ api/tsconfig.json
 .floo
 .flooignore
 
-#config file
-librechat.yaml
-librechat.yml
-
 # Environment
 .env*
 my.secrets
