@@ -5,6 +5,16 @@
 **/.DS_Store
 **/.vscode
 **/node_modules
+**/dist
+
+# Runtime data bind-mounted on the server: it changes between deploys, so
+# sending it would bloat the build context and invalidate the source layer
+/uploads
+/images
+/logs
+/data
+/pgdata*
+/meilisearch*
 
 # Specific patterns to ignore
 data-node

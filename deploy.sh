@@ -34,11 +34,38 @@ command -v docker >/dev/null 2>&1 || fail "docker not found"
 [ -f "librechat.yaml" ]   || fail "librechat.yaml not found — copy librechat.example.yaml and configure it"
 [ -f "$COMPOSE_FILE" ]    || fail "$COMPOSE_FILE not found"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLEANUP="$SCRIPT_DIR/cleanup.sh"
+[ -f "$CLEANUP" ] || fail "cleanup.sh not found next to deploy.sh"
+
+# A failed build still leaves layers and cache behind; reclaim them so the
+# next attempt doesn't start with less space than this one did
+on_exit() {
+  local status=$?
+  if [ "$status" -ne 0 ]; then
+    log "Deploy failed (exit $status) — cleaning up leftover Docker images and build cache..."
+    bash "$CLEANUP" || true
+  fi
+}
+trap on_exit EXIT
+
 # A build that fills the disk takes MongoDB down with it (same volume as Docker's data)
 DOCKER_ROOT="$(docker info -f '{{.DockerRootDir}}')"
-FREE_GB=$(( $(df -Pk "$DOCKER_ROOT" | awk 'NR==2 {print $4}') / 1024 / 1024 ))
+free_gb() { echo $(( $(df -Pk "$DOCKER_ROOT" | awk 'NR==2 {print $4}') / 1024 / 1024 )); }
+
+FREE_GB=$(free_gb)
+if [ "$FREE_GB" -lt "$MIN_FREE_GB" ]; then
+  log "Only ${FREE_GB}GB free on $DOCKER_ROOT (need ${MIN_FREE_GB}GB) — running cleanup..."
+  bash "$CLEANUP"
+  FREE_GB=$(free_gb)
+fi
+if [ "$FREE_GB" -lt "$MIN_FREE_GB" ]; then
+  log "Still only ${FREE_GB}GB free — removing all images not used by a running container..."
+  bash "$CLEANUP" --all
+  FREE_GB=$(free_gb)
+fi
 [ "$FREE_GB" -ge "$MIN_FREE_GB" ] \
-  || fail "Only ${FREE_GB}GB free on $DOCKER_ROOT (need ${MIN_FREE_GB}GB) — run ./cleanup.sh first"
+  || fail "Only ${FREE_GB}GB free on $DOCKER_ROOT after cleanup (need ${MIN_FREE_GB}GB) — free space manually (logs, uploads, other projects)"
 log "Disk space OK: ${FREE_GB}GB free on $DOCKER_ROOT"
 
 # ── 2. Pull latest code ───────────────────────
@@ -50,8 +77,9 @@ if [ "$SKIP_PULL" = false ]; then
 fi
 
 # ── 3. Build Docker image ─────────────────────
+# BuildKit is required for the Dockerfile's cache mounts (default since Docker 23)
 log "Building Docker image: $IMAGE ..."
-docker build $NO_CACHE \
+DOCKER_BUILDKIT=1 docker build $NO_CACHE \
   --build-arg NODE_MAX_OLD_SPACE_SIZE=3072 \
   -t "$IMAGE" \
   -f Dockerfile \
@@ -93,7 +121,13 @@ until docker inspect --format='{{.State.Health.Status}}' SheraliatAI-API 2>/dev/
   sleep 5
 done
 
-# ── 7. Summary ────────────────────────────────
+# ── 7. Reclaim space ──────────────────────────
+# The new containers now use the new image, so the previous build is
+# dangling; build cache is trimmed to a budget and kept for the next build
+log "Cleaning up old Docker images and build cache..."
+bash "$CLEANUP" || log "Warning: cleanup failed — run ./cleanup.sh manually"
+
+# ── 8. Summary ────────────────────────────────
 log "─────────────────────────────────────"
 log "Deploy complete."
 log "Running containers:"

@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Sheraliat AI - Multi-stage Docker Build
 # Based on LibreChat v0.8.9-rc1
 
@@ -49,19 +50,33 @@ RUN --mount=type=cache,target=/home/node/.npm,uid=1000 \
         sleep 10 ; \
     done
 
-# Copy source
-COPY --chown=node:node . .
-
-# Build packages then frontend
+# Build packages then frontend. Each package's source is copied right before
+# its own build, so a change only rebuilds that package and the ones after it
+# (a client-only change reuses every package build from cache).
 ENV NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}"
-ARG VITE_MCP_SANDBOX_URL=
+
+COPY --chown=node:node packages/data-provider ./packages/data-provider
 RUN npm run build:data-provider
+
+COPY --chown=node:node packages/data-schemas ./packages/data-schemas
 RUN npm run build:data-schemas
+
+COPY --chown=node:node packages/api ./packages/api
 RUN npm run build:api
+
+COPY --chown=node:node packages/client ./packages/client
 RUN npm run build:client-package
+
+COPY --chown=node:node packages/chat ./packages/chat
 RUN npm run build:chat
+
+ARG VITE_MCP_SANDBOX_URL=
+COPY --chown=node:node client ./client
 RUN --mount=type=cache,target=/app/client/node_modules/.vite,uid=1000 \
     cd client && npm run build
+
+# Remaining source (api/, config/, ...) — needs no build step
+COPY --chown=node:node . .
 
 # Prune dev dependencies
 RUN npm prune --omit=dev --no-audit --no-fund && npm cache clean --force
