@@ -67,7 +67,10 @@ function AuthLayout({
         <div className="mx-auto sm:max-w-sm">
           <ErrorMessage>
             {localize('com_auth_error_invalid_reset_token')}{' '}
-            <a className="font-semibold text-maroon-600 hover:underline" href="/forgot-password">
+            <a
+              className="text-accent-primary font-semibold hover:underline"
+              href="/forgot-password"
+            >
               {localize('com_auth_click_here')}
             </a>{' '}
             {localize('com_auth_to_try_again')}
@@ -87,15 +90,17 @@ function AuthLayout({
   return (
     <div className="auth-bg relative flex min-h-screen flex-col">
       <Banner />
-      <BlinkAnimation active={isFetching}>
-        <div className="mt-10 flex w-full justify-center">
-          <img
-            src="assets/sheraliat-ai.png"
-            className="h-36 w-36 rounded-3xl object-contain drop-shadow-xl sm:h-48 sm:w-48"
-            alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'Sheraliat AI' })}
-          />
-        </div>
-      </BlinkAnimation>
+      {!isLogin && (
+        <BlinkAnimation active={isFetching}>
+          <div className="mt-10 flex w-full justify-center">
+            <img
+              src="assets/sheraliat-ai.png"
+              className="h-36 w-36 rounded-3xl object-contain drop-shadow-xl sm:h-48 sm:w-48"
+              alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'Sheraliat AI' })}
+            />
+          </div>
+        </BlinkAnimation>
+      )}
       <DisplayError />
       <div className="absolute inset-s-0 bottom-0 md:m-4">
         <ThemeSelector />
@@ -104,7 +109,7 @@ function AuthLayout({
       <main className="flex grow items-center justify-center">
         <div
           className={cn(
-            'overflow-hidden rounded-2xl border border-white/10 bg-white/90 px-6 py-4 shadow-2xl backdrop-blur-md dark:bg-gray-900/80',
+            'bg-surface-primary/90 overflow-hidden rounded-2xl border border-white/10 px-6 py-4 shadow-2xl backdrop-blur-md',
             isTwoFactorSetup ? 'w-11/12 max-w-lg' : 'w-authPageWidth sm:max-w-md',
           )}
         >
