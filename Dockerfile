@@ -1,9 +1,14 @@
 # syntax=docker/dockerfile:1
 # Sheraliat AI - Multi-stage Docker Build
 # Based on LibreChat v0.8.9-rc1
+#
+#   base     toolchain + package manifests (shared)
+#   deps     production node_modules only — cached until a manifest/lockfile changes
+#   builder  full install + package/frontend builds — each package cached separately
+#   runner   deps' node_modules + builder's build output
 
-# ── Stage 1: Builder ──────────────────────────────────────────
-FROM node:24.22.1-alpine AS builder
+# ── Stage 1: Base ─────────────────────────────────────────────
+FROM node:24.22.1-alpine AS base
 
 RUN apk upgrade --no-cache
 RUN apk add --no-cache python3 py3-pip
@@ -11,9 +16,21 @@ RUN apk add --no-cache python3 py3-pip
 # Disable dependency installation analytics before any npm lifecycle scripts run.
 ENV SCARF_ANALYTICS=false
 
-ARG NODE_MAX_OLD_SPACE_SIZE=3072
-ARG NPM_CI_TIMEOUT_SECONDS=1500
-ARG NPM_CI_ATTEMPTS=2
+# npm ci with retries; NPM_CI_ATTEMPTS comes from the calling stage's ARG
+COPY --chmod=755 <<'EOF' /usr/local/bin/npm-ci-retry
+#!/bin/sh
+attempts="${NPM_CI_ATTEMPTS:-3}"
+attempt=1
+until npm ci --no-audit --no-fund --prefer-offline "$@"; do
+  status=$?
+  if [ "$attempt" -ge "$attempts" ]; then
+    exit "$status"
+  fi
+  echo "npm ci failed (exit $status); retrying attempt $((attempt + 1))/$attempts"
+  attempt=$((attempt + 1))
+  sleep 10
+done
+EOF
 
 RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
@@ -38,17 +55,26 @@ RUN \
     npm config set fetch-retries 5 ; \
     npm config set fetch-retry-mintimeout 15000
 
+# ── Stage 2: Production dependencies ──────────────────────────
+# Replaces `npm prune --omit=dev` after the build, which re-resolved the whole
+# tree and deleted dev packages on every deploy. This runs only when a
+# manifest or the lockfile changes, so the runner's node_modules layer is
+# reused as-is otherwise.
+FROM base AS deps
+
+ARG NPM_CI_ATTEMPTS=2
+
 RUN --mount=type=cache,target=/home/node/.npm,uid=1000 \
-    attempt=1 ; \
-    until npm ci --no-audit --prefer-offline ; do \
-        status=$? ; \
-        if [ "$attempt" -ge "${NPM_CI_ATTEMPTS:-3}" ]; then \
-            exit "$status" ; \
-        fi ; \
-        echo "npm ci failed (exit $status); retrying attempt $((attempt + 1))/${NPM_CI_ATTEMPTS:-3}" ; \
-        attempt=$((attempt + 1)) ; \
-        sleep 10 ; \
-    done
+    npm-ci-retry --omit=dev
+
+# ── Stage 3: Builder ──────────────────────────────────────────
+FROM base AS builder
+
+ARG NODE_MAX_OLD_SPACE_SIZE=3072
+ARG NPM_CI_ATTEMPTS=2
+
+RUN --mount=type=cache,target=/home/node/.npm,uid=1000 \
+    npm-ci-retry
 
 # Build packages then frontend. Each package's source is copied right before
 # its own build, so a change only rebuilds that package and the ones after it
@@ -78,10 +104,7 @@ RUN --mount=type=cache,target=/app/client/node_modules/.vite,uid=1000 \
 # Remaining source (api/, config/, ...) — needs no build step
 COPY --chown=node:node . .
 
-# Prune dev dependencies
-RUN npm prune --omit=dev --no-audit --no-fund && npm cache clean --force
-
-# ── Stage 2: Runtime ──────────────────────────────────────────
+# ── Stage 4: Runtime ──────────────────────────────────────────
 FROM node:24.22.1-alpine AS runner
 
 # OCI Labels
@@ -105,14 +128,18 @@ WORKDIR /app
 
 USER node
 
-# Copy built artifacts from builder
-COPY --from=builder --chown=node:node /app/package.json /app/package-lock.json ./
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/api ./api
+# Production dependencies first: the largest layer, unchanged between
+# deploys unless dependencies change. Includes manifests and the nested
+# workspace node_modules (api/, packages/*); the client needs none at runtime.
+COPY --from=deps --chown=node:node --exclude=client /app ./
+
+# Built artifacts and source from builder; its node_modules include dev
+# dependencies, so they are left behind
+COPY --from=builder --chown=node:node --exclude=**/node_modules /app/api ./api
 COPY --from=builder --chown=node:node /app/client/dist ./client/dist
 COPY --from=builder --chown=node:node /app/client/public ./client/public
-COPY --from=builder --chown=node:node /app/packages ./packages
-COPY --from=builder --chown=node:node /app/vendor ./vendor
+COPY --from=builder --chown=node:node --exclude=**/node_modules /app/packages ./packages
+COPY --from=builder --chown=node:node --exclude=**/node_modules /app/vendor ./vendor
 COPY --from=builder --chown=node:node /app/config ./config
 
 # Ensure writable directories exist
