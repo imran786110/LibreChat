@@ -3,16 +3,23 @@ export * from './azure';
 export * from './bedrock';
 export * from './balance';
 export * from './config';
+export * from './clientLimits';
 export * from './footer';
+export * from './theme';
+export * from './themes';
 export * from './langchain';
 export * from './filters';
 export * from './file-config';
 export * from './resolve-llm-delivery-path';
 /* messages  */
 export * from './messages';
+export * from './previews';
 export * from './errors';
 /* run steps */
 export * from './runSteps';
+/* ui parts */
+export * from './parts';
+export * from './reasoning';
 export * from './toolTiming';
 /* artifacts  */
 export * from './artifacts';
@@ -24,6 +31,8 @@ export * from './models';
 export * from './families';
 /* mcp */
 export * from './mcp';
+export * from './mcp/appMime';
+export * from './mcp/csp';
 /* RBAC */
 export * from './permissions';
 export * from './roles';
@@ -45,8 +54,20 @@ export * from './types/web';
 export * from './types/graph';
 export * from './types/insights';
 export * from './types/traces';
+export * from './types/transport';
+export type {
+  OutputTextProtectionPolicy,
+  OutputProtectionConfig,
+  OutputProtectionTarget,
+  OutputProtectionDestination,
+  OutputProtectionErrorCode,
+  OutputProtectionCategoryCount,
+  OutputProtectionResult,
+  OutputProtectionAudit,
+} from './types/protection';
 export * from './types/subagents';
 export * from './types/background';
+export * from './types/pullRequest';
 export * from './types/queuedTurns';
 /* access permissions */
 export * from './accessPermissions';
@@ -70,7 +91,9 @@ export * from './providers';
 export * from './svg';
 /* general helpers */
 export * from './utils';
+export * from './zod';
 export * from './actions';
+export * from './twoFactor';
 export { default as createPayload } from './createPayload';
 // /* react query hooks */
 // export * from './react-query/react-query-service';
@@ -84,3 +107,9 @@ export * from './codeEnvRef';
 export * from './code/worker';
 export * from './code/approval';
 export * from './code/workspace';
+
+export * from './types/scheduleConsent';
+
+export * from './approval';
+
+export * from './codeSetup';

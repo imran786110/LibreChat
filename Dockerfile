@@ -1,9 +1,10 @@
 # Sheraliat AI - Multi-stage Docker Build
-# Based on LibreChat v0.8.8
+# Based on LibreChat v0.8.9-rc1
 
 # ── Stage 1: Builder ──────────────────────────────────────────
-FROM node:24-alpine AS builder
+FROM node:24.22.1-alpine AS builder
 
+RUN apk upgrade --no-cache
 RUN apk add --no-cache python3 py3-pip
 
 # Disable dependency installation analytics before any npm lifecycle scripts run.
@@ -26,6 +27,8 @@ COPY --chown=node:node packages/data-provider/package.json ./packages/data-provi
 COPY --chown=node:node packages/data-schemas/package.json ./packages/data-schemas/package.json
 COPY --chown=node:node packages/api/package.json ./packages/api/package.json
 COPY --chown=node:node packages/client/package.json ./packages/client/package.json
+COPY --chown=node:node packages/chat/package.json ./packages/chat/package.json
+COPY --chown=node:node vendor/code ./vendor/code
 
 RUN \
     touch .env ; \
@@ -51,28 +54,30 @@ COPY --chown=node:node . .
 
 # Build packages then frontend
 ENV NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}"
+ARG VITE_MCP_SANDBOX_URL=
 RUN npm run build:data-provider
 RUN npm run build:data-schemas
 RUN npm run build:api
 RUN npm run build:client-package
+RUN npm run build:chat
 RUN --mount=type=cache,target=/app/client/node_modules/.vite,uid=1000 \
     cd client && npm run build
 
 # Prune dev dependencies
-RUN npm prune --production && npm cache clean --force
+RUN npm prune --omit=dev --no-audit --no-fund && npm cache clean --force
 
 # ── Stage 2: Runtime ──────────────────────────────────────────
-FROM node:24-alpine AS runner
+FROM node:24.22.1-alpine AS runner
 
 # OCI Labels
 LABEL org.opencontainers.image.title="Sheraliat AI" \
       org.opencontainers.image.description="German-hosted, branded fork of LibreChat" \
       org.opencontainers.image.vendor="Your Company" \
       org.opencontainers.image.source="https://github.com/your-org/sheraliat-ai" \
-      org.opencontainers.image.version="0.8.8"
+      org.opencontainers.image.version="0.8.9-rc1"
 
 # Install runtime dependencies
-RUN apk add --no-cache jemalloc wget python3 py3-pip uv tini
+RUN apk upgrade --no-cache && apk add --no-cache jemalloc wget python3 py3-pip uv tini
 
 # Add uv for MCP support
 COPY --from=ghcr.io/astral-sh/uv:0.9.5-python3.12-alpine /usr/local/bin/uv /usr/local/bin/uvx /bin/
@@ -92,11 +97,12 @@ COPY --from=builder --chown=node:node /app/api ./api
 COPY --from=builder --chown=node:node /app/client/dist ./client/dist
 COPY --from=builder --chown=node:node /app/client/public ./client/public
 COPY --from=builder --chown=node:node /app/packages ./packages
+COPY --from=builder --chown=node:node /app/vendor ./vendor
 COPY --from=builder --chown=node:node /app/config ./config
-COPY --from=builder --chown=node:node /app/src ./src
 
 # Ensure writable directories exist
-RUN mkdir -p /app/client/public/images /app/logs /app/uploads && touch /app/.env
+RUN mkdir -p /app/client/public/images /app/logs /app/uploads /app/skill /app/data && \
+    chmod 1777 /app/data && touch /app/.env
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0

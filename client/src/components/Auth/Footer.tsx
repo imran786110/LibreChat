@@ -1,4 +1,5 @@
 import { TStartupConfig } from 'librechat-data-provider';
+import { policyUrls } from '~/utils/policies';
 import { useLocalize } from '~/hooks';
 
 function Footer({ startupConfig }: { startupConfig: TStartupConfig | null | undefined }) {
@@ -10,16 +11,15 @@ function Footer({ startupConfig }: { startupConfig: TStartupConfig | null | unde
   const divider = <div className="border-r-[1px] border-gray-300 dark:border-gray-600" />;
 
   // Always show legal links for Sheraliat AI, regardless of config
-  const privacyPolicy = startupConfig?.interface?.privacyPolicy;
-  const termsOfService = startupConfig?.interface?.termsOfService;
+  const { privacyPolicyUrl, termsOfServiceUrl } = policyUrls(startupConfig);
 
   return (
     <div className="align-end m-4 flex flex-wrap justify-center gap-2" role="contentinfo">
-      <a className={linkClass} href={termsOfService?.externalUrl || '/terms'} rel="noreferrer">
+      <a className={linkClass} href={termsOfServiceUrl ?? '/terms'} rel="noreferrer">
         {localize('com_sheraliat_terms_title')}
       </a>
       {divider}
-      <a className={linkClass} href={privacyPolicy?.externalUrl || '/privacy'} rel="noreferrer">
+      <a className={linkClass} href={privacyPolicyUrl ?? '/privacy'} rel="noreferrer">
         {localize('com_sheraliat_privacy_title')}
       </a>
       {divider}

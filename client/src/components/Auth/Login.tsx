@@ -123,7 +123,7 @@ function Login() {
         />
       )}
       {startupConfig?.registrationEnabled === true && (
-        <p className="my-4 text-center text-sm font-light text-text-secondary">
+        <p className="text-text-secondary my-4 text-center text-sm font-light">
           {' '}
           {localize('com_auth_no_account')}{' '}
           <a
